@@ -165,6 +165,8 @@ class Provider implements Injector {
      * 
      * @param string $className
      * @param array $injectionDefinition An associative array matching constructor params to values
+     * @param array $hierarchyMatch An array of class names that will be matched against the hierarchy of class
+     * construction calls to select the appropriate injection definition. 
      * @throws \Auryn\BadArgumentException On missing raw injection prefix
      * @return \Auryn\Provider Returns the current instance
      */
