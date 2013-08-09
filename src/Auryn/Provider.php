@@ -37,7 +37,20 @@ class Provider implements Injector {
      * @return mixed A dependency-injected object
      */
     function make($className, array $customDefinition = array()) {
-        
+        $this->classHierarchy = array();
+        return $this->makeInternal($className, $customDefinition);
+    }
+
+    /**
+     * Instantiate a class according to a predefined or call-time injection definition
+     *
+     * @param string $className Class name
+     * @param array  $customDefinition An optional array of custom instantiation parameters
+     * @throws \Auryn\InjectionException
+     * @return mixed A dependency-injected object
+     */
+    private function makeInternal($className, array $customDefinition = array()) {
+
         array_push($this->classHierarchy, $className);
         
         $lowClass = strtolower($className);
@@ -332,7 +345,7 @@ class Provider implements Injector {
             $callableRefl = $this->reflectionStorage->getFunction($callableOrMethodArr);
             $executableArr = array($callableRefl, NULL);
         } elseif ($isString && method_exists($callableOrMethodArr, '__invoke')) {
-            $invocationObj = $this->make($callableOrMethodArr);
+            $invocationObj = $this->makeInternal($callableOrMethodArr);
             $callableRefl = $this->reflectionStorage->getMethod($invocationObj, '__invoke');
             $executableArr = array($callableRefl, $invocationObj);
         } elseif ($isString && strpos($callableOrMethodArr, '::') !== FALSE) {
@@ -351,7 +364,7 @@ class Provider implements Injector {
             $executableArr = array($callableRefl, $invocationObj);
         } elseif (is_callable($callableOrMethodArr)) {
             list($class, $method) = $callableOrMethodArr;
-            $invocationObj = $this->make($class);
+            $invocationObj = $this->makeInternal($class);
             $callableRefl = strpos($method, '::')
                 ? $this->generateStaticReflectionMethod($class, $method)
                 : $this->reflectionStorage->getMethod($class, $method);
@@ -361,7 +374,7 @@ class Provider implements Injector {
             && method_exists($callableOrMethodArr[0], $callableOrMethodArr[1])
         ) {
             list($class, $method) = $callableOrMethodArr;
-            $invocationObj = $this->make($class);
+            $invocationObj = $this->makeInternal($class);
             $callableRefl = $this->reflectionStorage->getMethod($class, $method);
             $executableArr = array($callableRefl, $invocationObj);
         } else {
@@ -391,7 +404,7 @@ class Provider implements Injector {
             $rawParamKey = self::RAW_INJECTION_PREFIX . $funcParam->name;
             
             if (isset($definition[$funcParam->name])) {
-                $funcArgs[] = $this->make($definition[$funcParam->name]);
+                $funcArgs[] = $this->makeInternal($definition[$funcParam->name]);
             } elseif (isset($definition[$rawParamKey])) {
                 $funcArgs[] = $definition[$rawParamKey];
             } else {
@@ -451,7 +464,7 @@ class Provider implements Injector {
     private function buildImplementation($interfaceOrAbstractName) {
         $lowClass  = strtolower($interfaceOrAbstractName);
         $implClass = $this->aliases[$lowClass];
-        $implObj   = $this->make($implClass);
+        $implObj   = $this->makeInternal($implClass);
         $implRefl  = $this->reflectionStorage->getClass($implClass);
         
         if (!$implRefl->isSubclassOf($interfaceOrAbstractName)) {
@@ -467,7 +480,7 @@ class Provider implements Injector {
         $typeHint = $this->reflectionStorage->getParamTypeHint($reflFunc, $reflParam);
           
         if ($typeHint && ($this->isInstantiable($typeHint) || $this->delegateExists($typeHint))) {
-            return $this->make($typeHint);
+            return $this->makeInternal($typeHint);
         } elseif ($typeHint) {
             return $this->buildAbstractTypehintParam($typeHint, $reflParam->name);
         } elseif ($reflParam->isDefaultValueAvailable()) {
