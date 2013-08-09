@@ -1,5 +1,59 @@
 <?php
 
+class WidgetWithParams {
+
+    public $name = null;
+
+    function __construct($name){
+        $this->name = $name;
+    }
+}
+
+class UsesWidgetWithParams1{
+ 
+    public $widget;
+    
+    public function __construct(WidgetWithParams $widget) {
+        $this->widget = $widget;
+    }
+}
+
+class UsesWidgetWithParams2 {
+    public $widget;
+
+    public function __construct(WidgetWithParams $widget) {
+        $this->widget = $widget;
+    }
+}
+
+class UsesWidget {
+    
+    public $widget;
+    
+    public function __construct(WidgetWithParams $widget) {
+        $this->widget = $widget;
+    }
+}
+
+class UsesWidgetWithParamsOnceRemoved1 {
+
+    public $usesWidget;
+    
+    function __construct(UsesWidget $usesWidget) {
+        $this->usesWidget = $usesWidget;
+    }
+}
+
+class UsesWidgetWithParamsOnceRemoved2 {
+
+    public $usesWidget;
+
+    function __construct(UsesWidget $usesWidget) {
+        $this->usesWidget = $usesWidget;
+    }
+}
+
+
 interface SharedAliasedInterface {
     function foo();
 }

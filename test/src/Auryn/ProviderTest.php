@@ -695,5 +695,53 @@ class ProviderTest extends PHPUnit_Framework_TestCase {
         $stdClass2 = $provider->make('StdClass');
         $this->assertSame($stdClass1, $stdClass2);
     }
-    
+
+    public function testHeirarchicalDefine1() {
+        $provider = new Auryn\Provider();
+
+        $widget1Name = 'parent1';
+        $widget2Name = 'parent2';
+
+        $provider->define('WidgetWithParams', array(':name' => 'parent1'), array('UsesWidgetWithParams1'));
+        $provider->define('WidgetWithParams', array(':name' => 'parent2'), array('UsesWidgetWithParams2'));
+
+        $usesWidgetWithParams1 = $provider->make('UsesWidgetWithParams1');
+        $usesWidgetWithParams2 = $provider->make('UsesWidgetWithParams2');
+        
+        $this->assertEquals($widget1Name, $usesWidgetWithParams1->widget->name);
+        $this->assertEquals($widget2Name, $usesWidgetWithParams2->widget->name);
+    }
+
+    public function testHeirarchicalDefine2() {
+        $provider = new Auryn\Provider();
+
+        $widget1Name = 'parent1';
+        $widget2Name = 'parent2';
+
+        $provider->define('WidgetWithParams', array(':name' => 'parent1'), array('UsesWidgetWithParamsOnceRemoved1'));
+        $provider->define('WidgetWithParams', array(':name' => 'parent2'), array('UsesWidgetWithParamsOnceRemoved2'));
+
+        $usesWidgetWithParamsOnceRemoved1 = $provider->make('UsesWidgetWithParamsOnceRemoved1');
+        $usesWidgetWithParamsOnceRemoved2 = $provider->make('UsesWidgetWithParamsOnceRemoved2');
+
+        $this->assertEquals($widget1Name, $usesWidgetWithParamsOnceRemoved1->usesWidget->widget->name);
+        $this->assertEquals($widget2Name, $usesWidgetWithParamsOnceRemoved2->usesWidget->widget->name);
+    }
+
+    public function testHeirarchicalMostSpecific() {
+        $provider = new Auryn\Provider();
+
+        $genericName = 'generic';
+        $specificName = 'specific';
+
+        $provider->define('WidgetWithParams', array(':name' => $genericName));
+        $provider->define('WidgetWithParams', array(':name' => $specificName), array('UsesWidgetWithParamsOnceRemoved1'));
+
+        $usesWidgetWithParamsOnceRemoved1 = $provider->make('UsesWidgetWithParamsOnceRemoved1');
+        $usesWidgetWithParams1 = $provider->make('UsesWidgetWithParams1');
+
+        $this->assertEquals($genericName, $usesWidgetWithParams1->widget->name);
+        $this->assertEquals($specificName, $usesWidgetWithParamsOnceRemoved1->usesWidget->widget->name);
+    }
+
 }

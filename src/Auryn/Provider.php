@@ -11,8 +11,14 @@ namespace Auryn;
 class Provider implements Injector {
     
     const RAW_INJECTION_PREFIX = ':';
-    
+
+    /**
+     * @var InjectionInfoCollection[]
+     */
     private $injectionDefinitions = array();
+
+    private $classHierarchy = array();
+    
     private $aliases = array();
     private $sharedClasses = array();
     private $delegatedClasses = array();
@@ -31,6 +37,9 @@ class Provider implements Injector {
      * @return mixed A dependency-injected object
      */
     function make($className, array $customDefinition = array()) {
+        
+        array_push($this->classHierarchy, $className);
+        
         $lowClass = strtolower($className);
         
         if (isset($this->aliases[$lowClass])) {
@@ -54,10 +63,16 @@ class Provider implements Injector {
         } catch(\ReflectionException $e){
             throw new InjectionException("Could not make $className: ".$e->getMessage(), $e->getCode(), $e);
         }
+        //TODO finally would require php 5.5
+        //finally {
+        //    array_pop($this->classhierarchy);
+        //}
 
         if ($this->isShared($lowClass)) {
             $this->sharedClasses[$lowClass] = $provisionedObject;
         }
+
+        array_pop($this->classHierarchy);
 
         return $provisionedObject;
     }
@@ -114,7 +129,7 @@ class Provider implements Injector {
         $lowClass = strtolower($className);
         
         if ($this->isDefined($lowClass)) {
-            return $this->injectionDefinitions[$lowClass];
+            return $this->injectionDefinitions[$lowClass]->getInjectionDefinition($this->classHierarchy);
         } else {
             return array();
         }
@@ -140,11 +155,16 @@ class Provider implements Injector {
      * @throws \Auryn\BadArgumentException On missing raw injection prefix
      * @return \Auryn\Provider Returns the current instance
      */
-    function define($className, array $injectionDefinition) {
+    function define($className, array $injectionDefinition, array $hierarchyMatch = array()) {
         $this->validateInjectionDefinition($injectionDefinition);
         $lowClass = strtolower($className);
-        $this->injectionDefinitions[$lowClass] = $injectionDefinition;
         
+        if (array_key_exists($lowClass, $this->injectionDefinitions) == false) {
+            $this->injectionDefinitions[$lowClass] = new InjectionInfoCollection();
+        }
+
+        $this->injectionDefinitions[$lowClass]->addInjectionDefintion($injectionDefinition, $hierarchyMatch);
+
         return $this;
     }
     
