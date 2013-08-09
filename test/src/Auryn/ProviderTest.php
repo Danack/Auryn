@@ -696,7 +696,7 @@ class ProviderTest extends PHPUnit_Framework_TestCase {
         $this->assertSame($stdClass1, $stdClass2);
     }
 
-    public function testHeirarchicalDefine1() {
+    public function testHierarchicalDefine1() {
         $provider = new Auryn\Provider();
 
         $widget1Name = 'parent1';
@@ -712,7 +712,7 @@ class ProviderTest extends PHPUnit_Framework_TestCase {
         $this->assertEquals($widget2Name, $usesWidgetWithParams2->widget->name);
     }
 
-    public function testHeirarchicalDefine2() {
+    public function testHierarchicalDefine2() {
         $provider = new Auryn\Provider();
 
         $widget1Name = 'parent1';
@@ -728,7 +728,7 @@ class ProviderTest extends PHPUnit_Framework_TestCase {
         $this->assertEquals($widget2Name, $usesWidgetWithParamsOnceRemoved2->usesWidget->widget->name);
     }
 
-    public function testHeirarchicalMostSpecific() {
+    public function testHierarchicalMostSpecific() {
         $provider = new Auryn\Provider();
 
         $genericName = 'generic';
