@@ -165,12 +165,12 @@ class Provider implements Injector {
      * 
      * @param string $className
      * @param array $injectionDefinition An associative array matching constructor params to values
-     * @param array $hierarchyMatch An array of class names that will be matched against the hierarchy of class
+     * @param array $chainClassConstructors An array of class names that will be matched against the chain of class
      * construction calls to select the appropriate injection definition. 
      * @throws \Auryn\BadArgumentException On missing raw injection prefix
      * @return \Auryn\Provider Returns the current instance
      */
-    function define($className, array $injectionDefinition, array $hierarchyMatch = array()) {
+    function define($className, array $injectionDefinition, array $chainClassConstructors = array()) {
         $this->validateInjectionDefinition($injectionDefinition);
         $lowClass = strtolower($className);
         
@@ -178,7 +178,7 @@ class Provider implements Injector {
             $this->injectionDefinitions[$lowClass] = new InjectionInfoCollection();
         }
 
-        $this->injectionDefinitions[$lowClass]->addInjectionDefintion($injectionDefinition, $hierarchyMatch);
+        $this->injectionDefinitions[$lowClass]->addInjectionDefintion($injectionDefinition, $chainClassConstructors);
 
         return $this;
     }

@@ -12,22 +12,22 @@ class InjectionInfoCollection {
     protected $injectionInfoArray = array();
 
 
-    function addInjectionDefintion(array $injectionDefinition, array $hierarchyMatch) {
-        $this->injectionInfoArray[] = new InjectionInfo($injectionDefinition, $hierarchyMatch);
+    function addInjectionDefintion(array $injectionDefinition, array $chainClassConstructors) {
+        $this->injectionInfoArray[] = new InjectionInfo($injectionDefinition, $chainClassConstructors);
     }
 
 
-    function getInjectionDefinition(array $classHierarchy) {
+    function getInjectionDefinition(array $chainClassConstructors) {
 
         if (count($this->injectionInfoArray) == 0) {
             return $this->injectionInfoArray[0];
         }
-        
+
         $bestInjectionInfo = null;
 
         $bestMatch = -1;
         foreach ($this->injectionInfoArray as $injectionInfo) {
-            if ($injectionInfo->getHierarchyMatch($classHierarchy) > $bestMatch){ 
+            if ($injectionInfo->getChainClassConstructors($chainClassConstructors) > $bestMatch){ 
                 $bestInjectionInfo = $injectionInfo;
             }
         }
@@ -35,7 +35,7 @@ class InjectionInfoCollection {
         if ($bestInjectionInfo == null) {
             $debugString = "Could not find definition for class in hierarchy:";
 
-            foreach ($classHierarchy as $className) {
+            foreach ($chainClassConstructors as $className) {
                 $debugString .= "\t$className\n";
             }
             

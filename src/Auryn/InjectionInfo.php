@@ -8,19 +8,19 @@ namespace Auryn;
 class InjectionInfo {
 
     private $injectionDefinition;
-    private $hierarchyMatch;
+    private $chainClassConstructors;
 
-    public function __construct(array $injectionDefinition, array $hierarchyMatch) {
+    public function __construct(array $injectionDefinition, array $chainClassConstructors) {
         $this->injectionDefinition = $injectionDefinition;
-        $this->hierarchyMatch = $hierarchyMatch;
+        $this->chainClassConstructors = $chainClassConstructors;
     }
     
-    public function getHierarchyMatch(array $classNameHierarchy) {
+    public function getChainClassConstructors(array $classNameHierarchy) {
 
         $usedIndex = 0;
         $score = 0;
 
-        foreach ($this->hierarchyMatch as $className) {
+        foreach ($this->chainClassConstructors as $className) {
             $found = false;
             
             for ($x = $usedIndex; $x<count($classNameHierarchy) ; $x++) {
