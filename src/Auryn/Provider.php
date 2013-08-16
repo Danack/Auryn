@@ -218,13 +218,13 @@ class Provider implements Injector {
      * @param $className
      * @param mixed $instance 
      */
-    protected function shareClassInstance($className, $instance = null) {
+    protected function shareClassInstance($className, $instance = NULL) {
         $lowClass = strtolower($className);
         if (isset($this->aliases[$lowClass])) {
             $lowClass = strtolower($this->aliases[$lowClass]);
         }
 
-        if (isset($this->sharedClasses[$lowClass]) == false){
+        if (isset($this->sharedClasses[$lowClass]) == FALSE){
             $this->sharedClasses[$lowClass] = $instance;
         }
     }
