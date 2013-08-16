@@ -198,26 +198,35 @@ class Provider implements Injector {
      */
     function share($classNameOrInstance) {
         if (is_string($classNameOrInstance)) {
-            $lowClass = strtolower($classNameOrInstance);
-            $lowClass = isset($this->aliases[$lowClass])
-                ? strtolower($this->aliases[$lowClass])
-                : $lowClass;
-            
-            $this->sharedClasses[$lowClass] = isset($this->sharedClasses[$lowClass])
-                ? $this->sharedClasses[$lowClass]
-                : NULL;
+            $this->shareClassInstance($classNameOrInstance);
         } elseif (is_object($classNameOrInstance)) {
-            $lowClass = strtolower(get_class($classNameOrInstance));
-            $this->sharedClasses[$lowClass] = $classNameOrInstance;
+            $this->shareClassInstance(get_class($classNameOrInstance), $classNameOrInstance);
         } else {
             $parameterType = gettype($classNameOrInstance);
             throw new BadArgumentException(
                 get_class($this).'::share() requires a string class name or object instance at ' .
-                'Argument 1; ' . gettype($classNameOrInstance) . ' specified'
+                'Argument 1; ' . $parameterType . ' specified'
             );
         }
         
         return $this;
+    }
+
+    /**
+     * Stores a shared instance of the specified class
+     * 
+     * @param $className
+     * @param mixed $instance 
+     */
+    protected function shareClassInstance($className, $instance = null) {
+        $lowClass = strtolower($className);
+        if (isset($this->aliases[$lowClass])) {
+            $lowClass = strtolower($this->aliases[$lowClass]);
+        }
+
+        if (isset($this->sharedClasses[$lowClass]) == false){
+            $this->sharedClasses[$lowClass] = $instance;
+        }
     }
     
     /**
