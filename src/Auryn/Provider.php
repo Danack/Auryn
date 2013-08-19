@@ -17,10 +17,15 @@ class Provider implements Injector {
      */
     private $injectionDefinitions = array();
 
+    /**
+     * @var ShareInfoCollection[]
+     */
+    private $sharedClasses = array();
+
     private $classHierarchy = array();
     
     private $aliases = array();
-    private $sharedClasses = array();
+    
     private $delegatedClasses = array();
     private $reflectionStorage;
 
@@ -64,8 +69,14 @@ class Provider implements Injector {
             // `isset` is used specifically here instead of `isShared` because classes may be marked
             // as "shared" before an instance is stored. In such cases, the class is shared, but
             // has a NULL value and must be instantiated by the Provider to create the shared instance.
-            if (isset($this->sharedClasses[$lowClass])) {
-                $provisionedObject = $this->sharedClasses[$lowClass];
+            
+            $sharedInstance = null;
+            if (isset($this->sharedClasses[$lowClass]) == true) {
+                $sharedInstance = $this->sharedClasses[$lowClass]->getSharedDefinition($this->classHierarchy);
+            }
+            
+            if ($sharedInstance != null) {
+                $provisionedObject = $sharedInstance;
             } elseif ($this->delegateExists($lowClass)) {
                 $delegate = $this->delegatedClasses[$lowClass];
                 $provisionedObject = $this->doDelegation($delegate, $className);
@@ -81,8 +92,13 @@ class Provider implements Injector {
         //    array_pop($this->classhierarchy);
         //}
 
-        if ($this->isShared($lowClass)) {
-            $this->sharedClasses[$lowClass] = $provisionedObject;
+        if ($sharedInstance == null) {
+            if (array_key_exists($lowClass, $this->sharedClasses) == true) {
+                if ($this->sharedClasses[$lowClass] == null) {
+                    $this->sharedClasses[$lowClass] = new ShareInfoCollection($lowClass); 
+                }
+                $this->sharedClasses[$lowClass]->setSharedInstance($provisionedObject);
+            }
         }
 
         array_pop($this->classHierarchy);
@@ -103,7 +119,7 @@ class Provider implements Injector {
                 0, $e
             );
         }
-        
+
         if (!($provisionedObject instanceof $class)) {
             throw new InjectionException(
                 "Delegate callable must return an instance of {$class}; " .
@@ -116,7 +132,6 @@ class Provider implements Injector {
     
     private function selectDefinition($className, $customDefinition) {
         $definitions = $this->selectParentDefinitions($className, $this->getDefinition($className));
-        
         return array_merge($definitions, $customDefinition);
     }
 
@@ -178,7 +193,7 @@ class Provider implements Injector {
             $this->injectionDefinitions[$lowClass] = new InjectionInfoCollection();
         }
 
-        $this->injectionDefinitions[$lowClass]->addInjectionDefintion($injectionDefinition, $chainClassConstructors);
+        $this->injectionDefinitions[$lowClass]->addInjectionDefinition($injectionDefinition, $chainClassConstructors);
 
         return $this;
     }
@@ -234,15 +249,18 @@ class Provider implements Injector {
      * as "shared" and the next time the Provider is used to instantiate the
      * class it's instance will be stored and shared.
      * 
-     * @param mixed $classNameOrInstance
+     * @param mixed $instance
      * @throws \Auryn\BadArgumentException
      * @return \Auryn\Provider Returns the current instance
      */
-    function share($classNameOrInstance) {
+
+    function share($classNameOrInstance, array $chainClassConstructors = array()) {
         if (is_string($classNameOrInstance)) {
-            $this->shareClassInstance($classNameOrInstance);
+            $this->setClassAsShared($classNameOrInstance);
         } elseif (is_object($classNameOrInstance)) {
-            $this->shareClassInstance(get_class($classNameOrInstance), $classNameOrInstance);
+            $className = get_class($classNameOrInstance);
+            $this->setClassAsShared($className);
+            $this->setSharedInstance($className, $classNameOrInstance, $chainClassConstructors);
         } else {
             $parameterType = gettype($classNameOrInstance);
             throw new BadArgumentException(
@@ -250,27 +268,48 @@ class Provider implements Injector {
                 'Argument 1; ' . $parameterType . ' specified'
             );
         }
-        
+    
         return $this;
     }
+    
+    
+    function setClassAsShared($className) {
+        $lowClass = strtolower($className);
 
-    /**
-     * Stores a shared instance of the specified class
-     * 
-     * @param $className
-     * @param mixed $instance 
-     */
-    protected function shareClassInstance($className, $instance = null) {
+        if (isset($this->aliases[$lowClass]) == true) { 
+            $lowClass = strtolower($this->aliases[$lowClass]);
+        }
+
+        if (array_key_exists($lowClass, $this->sharedClasses) == false){
+            $this->sharedClasses[$lowClass] = null;
+            //$this->sharedClasses[$lowClass] = new ShareInfoCollection($lowClass);
+        }   
+    }
+
+
+    function setSharedInstance($className, $instance, array $chainClassConstructors = array()) {
+        if (is_object($instance) == false) {
+            $parameterType = gettype($instance);
+            throw new BadArgumentException(
+                get_class($this).'::share() requires a object at ' .
+                'Argument 1; ' . $parameterType . ' specified'
+            );
+        }
+        //TODO add type check
+
         $lowClass = strtolower($className);
         if (isset($this->aliases[$lowClass])) {
             $lowClass = strtolower($this->aliases[$lowClass]);
         }
 
-        if (isset($this->sharedClasses[$lowClass]) == false){
-            $this->sharedClasses[$lowClass] = $instance;
+        if (array_key_exists($lowClass, $this->sharedClasses) == false ||
+            $this->sharedClasses[$lowClass] === null) {
+            $this->sharedClasses[$lowClass] = new ShareInfoCollection($lowClass);
         }
+
+        $this->sharedClasses[$lowClass]->setSharedInstance($instance, $chainClassConstructors);
     }
-    
+
     /**
      * Unshares the specified class
      * 
@@ -293,7 +332,7 @@ class Provider implements Injector {
     function refresh($className) {
         $className = strtolower($className);
         if (isset($this->sharedClasses[$className])) {
-            $this->sharedClasses[$className] = NULL;
+            $this->sharedClasses[$className]->clearSharedInstance();
         }
         
         return $this;

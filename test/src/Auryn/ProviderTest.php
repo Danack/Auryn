@@ -705,7 +705,7 @@ class ProviderTest extends PHPUnit_Framework_TestCase {
         $this->assertSame($stdClass1, $stdClass2);
     }
 
-    public function testHierarchicalDefine1() {
+    public function testClassConstructorChainDefine1() {
         $provider = new Auryn\Provider();
 
         $widget1Name = 'parent1';
@@ -721,7 +721,7 @@ class ProviderTest extends PHPUnit_Framework_TestCase {
         $this->assertEquals($widget2Name, $usesWidgetWithParams2->widget->name);
     }
 
-    public function testHierarchicalDefine2() {
+    public function testClassConstructorChainDefine2() {
         $provider = new Auryn\Provider();
 
         $widget1Name = 'parent1';
@@ -737,7 +737,7 @@ class ProviderTest extends PHPUnit_Framework_TestCase {
         $this->assertEquals($widget2Name, $usesWidgetWithParamsOnceRemoved2->usesWidget->widget->name);
     }
 
-    public function testHierarchicalMostSpecific() {
+    public function testClassConstructorChainMostSpecific() {
         $provider = new Auryn\Provider();
 
         $genericName = 'generic';
@@ -753,4 +753,71 @@ class ProviderTest extends PHPUnit_Framework_TestCase {
         $this->assertEquals($specificName, $usesWidgetWithParamsOnceRemoved1->usesWidget->widget->name);
     }
 
+
+    public function testClassConstructorChainSharing() {
+
+        $provider = new Auryn\Provider();
+
+        $warningLogger = new Logger('warn');
+        $infoLogger = new Logger('info');
+
+        $provider->share($warningLogger, array('RequiresLogger1'));
+        $provider->share($infoLogger, array('RequiresLogger2'));
+
+        $requiresLogger1 = $provider->make('RequiresLogger1');
+        $requiresLogger2 = $provider->make('RequiresLogger2');
+
+        $this->assertEquals('warn', $requiresLogger1->requiresLoggerDependency1->logger->getLogLevel());
+        $this->assertEquals('info', $requiresLogger2->requiresLoggerDependency2->logger->getLogLevel());
+    }
+
+
+    public function testClassConstructorChainSharing2() {
+
+        $provider = new Auryn\Provider();
+
+        $warningLogger = new Logger('warn');
+        $infoLogger = new Logger('info');
+
+        $provider->share($warningLogger); //Used by all classes
+        //$provider->share($infoLogger, array('RequiresLogger2')); //used by RequiresLogger2 and it's constructor dependencies. 
+
+        $requiresLogger1 = $provider->make('RequiresLogger1');
+        //$requiresLogger2 = $provider->make('RequiresLogger2');
+
+        $this->assertEquals('warn', $requiresLogger1->requiresLoggerDependency1->logger->getLogLevel());
+        //$this->assertEquals('info', $requiresLogger2->requiresLoggerDependency2->logger->getLogLevel());
+    }
+    
+    public function testClassConstructorChainSharing3() {
+
+        $provider = new Auryn\Provider();
+
+        $warningLogger = new Logger('warn');
+        $infoLogger = new Logger('info');
+
+        $provider->share($warningLogger); //Used by all classes
+        $provider->share($infoLogger, array('RequiresLogger2')); //used by RequiresLogger2 and it's constructor dependencies. 
+
+        $requiresLogger1 = $provider->make('RequiresLogger1');
+        $requiresLogger2 = $provider->make('RequiresLogger2');
+
+        $this->assertEquals('warn', $requiresLogger1->requiresLoggerDependency1->logger->getLogLevel());
+        $this->assertEquals('info', $requiresLogger2->requiresLoggerDependency2->logger->getLogLevel());
+    }
+    
+    //TODO - add another test regarding creating multiple shared objects.
+
+    public function testSharingAliasedClass() {
+
+        $provider = new Auryn\Provider();
+
+        $testClass = new TestSharingClass();
+        $provider->alias('TestSharingClass', 'AliasedTestSharingClass');
+        $provider->share($testClass);
+        $instance = $provider->make('TestSharingClass');
+
+        //echo get_class($instance);
+        //exit(0);
+    }
 }
