@@ -807,6 +807,8 @@ class ProviderTest extends PHPUnit_Framework_TestCase {
     }
     
     //TODO - add another test regarding creating multiple shared objects.
+    
+    //TODO - add alias + hierarchical sharing test
 
     public function testSharingAliasedClass() {
 
