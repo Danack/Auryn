@@ -334,6 +334,30 @@ class ProviderTest extends PHPUnit_Framework_TestCase {
 
         $this->assertInstanceOf('TestDependency', $obj);
     }
+
+    /**
+     * @covers Auryn\Provider::delegate
+     * @covers Auryn\Provider::doDelegation
+     * @covers Auryn\Provider::make
+     */
+    public function testMakeDelegateWithArgs() {
+        $provider= new Provider(new ReflectionPool);
+
+        $callable = $this->getMock(
+            'CallableMockWithArgs',
+            array('__invoke')
+        );
+        $callable->expects($this->once())
+            ->method('__invoke')
+            ->with(1, 2)
+            ->will($this->returnValue(new TestDependency()));
+
+        $provider->delegate('TestDependency', $callable, [':arg1' => 1, ':arg2' => 2]);
+
+        $obj = $provider->make('TestDependency');
+
+        $this->assertInstanceOf('TestDependency', $obj);
+    }
     
     /**
      * @covers Auryn\Provider::doDelegation
@@ -668,7 +692,7 @@ class ProviderTest extends PHPUnit_Framework_TestCase {
         $this->assertSame($class, $class2);
     }
 
-    public function testSharedByAliasedInterfaceName2() {
+    public function testSharedByAliasedInterfaceNameReversedOrder() {
         $provider = new Auryn\Provider();
         $provider->share('SharedAliasedInterface');
         $provider->alias('SharedAliasedInterface', 'SharedClass');
@@ -694,7 +718,6 @@ class ProviderTest extends PHPUnit_Framework_TestCase {
         $childClass = $provider->make('ClassWithAliasAsParameter');
         $this->assertSame($sharedClass, $childClass->getSharedClass());
     }
-
 
     public function testMultipleShareCallsDontOverrideTheOriginalSharedInstance() {
         $provider = new Auryn\Provider();
@@ -789,6 +812,7 @@ class ProviderTest extends PHPUnit_Framework_TestCase {
         //$this->assertEquals('info', $requiresLogger2->requiresLoggerDependency2->logger->getLogLevel());
     }
     
+
     public function testClassConstructorChainSharing3() {
 
         $provider = new Auryn\Provider();
@@ -819,7 +843,48 @@ class ProviderTest extends PHPUnit_Framework_TestCase {
         $provider->share($testClass);
         $instance = $provider->make('TestSharingClass');
 
-        //echo get_class($instance);
-        //exit(0);
+        $this->assertInstanceOf('AliasedTestSharingClass', $instance);
     }
+
+    /**
+     * @dataProvider provideInaccessibleExecutables
+     */
+    public function testGetExecutableMakesMethodsAccessible($toInvoke, $expectedResult) {
+        $provider = new Auryn\Provider();
+        $executable = $provider->getExecutable($toInvoke, $setAccessible = TRUE);
+        $this->assertSame($expectedResult, $executable());
+    }
+    
+    public function provideInaccessibleExecutables() {
+        $return = array();
+        
+        // 0 -------------------------------------------------------------------------------------->
+        
+        $toInvoke = array('InaccessibleExecutableClassMethod', 'doSomethingPrivate');
+        $expectedResult = 42;
+        $return[] = array($toInvoke, $expectedResult);
+        
+        // 1 -------------------------------------------------------------------------------------->
+        
+        $toInvoke = 'InaccessibleStaticExecutableClassMethod::doSomethingPrivate';
+        $expectedResult = 42;
+        $return[] = array($toInvoke, $expectedResult);
+        
+        // 2 -------------------------------------------------------------------------------------->
+        
+        $toInvoke = array('InaccessibleExecutableClassMethod', 'doSomethingProtected');
+        $expectedResult = 42;
+        $return[] = array($toInvoke, $expectedResult);
+        
+        // 3 -------------------------------------------------------------------------------------->
+        
+        $toInvoke = 'InaccessibleStaticExecutableClassMethod::doSomethingProtected';
+        $expectedResult = 42;
+        $return[] = array($toInvoke, $expectedResult);
+        
+        // x -------------------------------------------------------------------------------------->
+        
+        return $return;
+    }
+
 }

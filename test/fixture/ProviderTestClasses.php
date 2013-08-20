@@ -122,6 +122,34 @@ class UsesWidgetWithParamsOnceRemoved2 {
 }
 
 
+
+class InaccessibleExecutableClassMethod {
+    private function doSomethingPrivate() {
+        return 42;
+    }
+    protected function doSomethingProtected() {
+        return 42;
+    }
+}
+
+class InaccessibleStaticExecutableClassMethod {
+    private static function doSomethingPrivate() {
+        return 42;
+    }
+    protected static function doSomethingProtected() {
+        return 42;
+    }
+}
+
+class RecursiveClass1 {
+    function __construct(RecursiveClass2 $dep) {}
+}
+
+class RecursiveClass2 {
+    function __construct(RecursiveClass1 $dep) {}
+}
+
+
 interface SharedAliasedInterface {
     function foo();
 }
@@ -268,6 +296,12 @@ class ProviderTestChildClass extends ProviderTestParentClass
 
 class CallableMock {
     function __invoke() {
+
+    }
+}
+
+class CallableMockWithArgs {
+    function __invoke($arg1, $arg2) {
 
     }
 }

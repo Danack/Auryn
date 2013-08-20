@@ -32,12 +32,13 @@ interface Injector {
     function alias($originalTypehint, $aliasClassName);
 
     /**
-     * Delegates the creation of $className instances to $callable.
+     * Delegates the creation of $className instances to $callable
      *
      * @param string $className
      * @param callable $callable
+     * @param array $args
      */
-    function delegate($className, $callable);
+    function delegate($className, $callable, array $args = array());
     
     /**
      * Shares the specified class across the Injector context
@@ -65,7 +66,16 @@ interface Injector {
      * 
      * @param mixed $callableOrMethodArr Any valid PHP callable or an array of the form [$className, $methodName]
      * @param array $invocationArgs An optional array specifying params to invoke the provisioned callable
+     * @param bool $makeAccessible If TRUE, protected/private methods will execute successfully
      */
-    function execute($callableOrMethodArr, array $invocationArgs = array());
-    
+    function execute($callableOrMethodArr, array $invocationArgs = array(), $makeAccessible = FALSE);
+
+    /**
+     * Generate and provision an executable from any PHP callable or class/method string array
+     * 
+     * @param mixed $callableOrMethodArr Any valid PHP callable or an array of the form [$className, $methodName]
+     * @param bool $makeAccessible If TRUE, protected/private methods will execute successfully
+     */
+    function getExecutable($callableOrMethodArr, $makeAccessible = FALSE);
+
 }

@@ -110,9 +110,9 @@ class Provider implements Injector {
         return isset($this->delegatedClasses[strtolower($class)]);
     }
     
-    private function doDelegation($callable, $class) {
+    private function doDelegation(array $callable, $class) {
         try {
-            $provisionedObject = $this->execute($callable);
+            $provisionedObject = $this->execute($callable[0], $callable[1]);
         } catch (\Exception $e) {
             throw new InjectionException(
                 "Delegation failed while attempting to provision {$class}",
@@ -345,12 +345,12 @@ class Provider implements Injector {
      * @throws \Auryn\BadArgumentException
      * @return \Auryn\Provider Returns the current instance
      */
-    function delegate($className, $callable) {
+    function delegate($className, $callable, array $args = array()) {
         if (is_callable($callable)
             || (is_string($callable) && method_exists($callable, '__invoke'))
             || (is_array($callable) && isset($callable[0], $callable[1]) && method_exists($callable[0], $callable[1]))
         ) {
-            $delegate = $callable;
+            $delegate = array($callable, $args);
         } else {
             throw new BadArgumentException(
                 get_class($this) . '::delegate expects a valid callable or provisionable executable ' .
@@ -365,31 +365,45 @@ class Provider implements Injector {
     }
     
     /**
-     * Invoke the specified callable or class/method array, provisioning dependencies along the way.
+     * Invoke the specified callable or class/method array, provisioning dependencies along the way
      * 
-     * @param mixed $callableOrMethodArr Valid PHP callable or an array of the form [$className, $methodName]
+     * @param mixed $callableOrMethodArr Valid PHP callable or an array of the form [class, method]
      * @param array $invocationArgs Optional array specifying params to invoke the provisioned callable
+     * @param bool $makeAccessible If TRUE, protected/private methods will execute successfully
      * @throws \Auryn\BadArgumentException
      * @throws \Auryn\InjectionException
-     * @return mixed Returns result from the specified invocation
+     * @return mixed Returns the invocation result from the generated executable
      */
-    function execute($callableOrMethodArr, array $invocationArgs = array()) {
-        $executableReflectionArr = $this->generateExecutableReflection($callableOrMethodArr);
+    function execute($callableOrMethodArr, array $invocationArgs = array(), $makeAccessible = FALSE) {
+        $executable = $this->getExecutable($callableOrMethodArr, $makeAccessible);
+        $reflectionFunction = $executable->getCallableReflection();
+        $args = $this->generateInvocationArgs($reflectionFunction, $invocationArgs);
         
-        if (!$executableReflectionArr) {
-            throw new BadArgumentException(
-                'Invalid executable: callable, invokable class name or an array in the form ' .
-                '[className, methodName] required at Argument 1'
-            );
+        return call_user_func_array(array($executable, '__invoke'), $args);
+    }
+    
+    /**
+     * Generate and provision an executable object from any PHP callable or class/method string array
+     * 
+     * @param mixed $callableOrMethodArr Valid PHP callable or an array of the form [class, method]
+     * @param bool $makeAccessible If TRUE, protected/private methods will execute successfully
+     * @throws \Auryn\BadArgumentException
+     * @throws \Auryn\InjectionException
+     * @return \Auryn\Executable Returns an executable object
+     */
+    function getExecutable($callableOrMethodArr, $makeAccessible = FALSE) {
+        $makeAccessible = (bool) $makeAccessible;
+        $executableArr = $this->generateExecutableReflection($callableOrMethodArr);
+        list($reflectionFunction, $invocationObject) = $executableArr;
+        
+        if ($makeAccessible
+            && $reflectionFunction instanceof \ReflectionMethod
+            && !$reflectionFunction->isPublic()
+        ) {
+            $reflectionFunction->setAccessible(TRUE);
         }
         
-        list($callableRefl, $invocationObj) = $executableReflectionArr;
-        
-        $args = $this->generateInvocationArgs($callableRefl, $invocationArgs);
-        
-        return ($callableRefl instanceof \ReflectionMethod)
-            ? $callableRefl->invokeArgs($invocationObj, $args)
-            : $callableRefl->invokeArgs($args);
+        return new Executable($reflectionFunction, $invocationObject);
     }
     
     private function generateExecutableReflection($callableOrMethodArr) {
@@ -435,7 +449,10 @@ class Provider implements Injector {
             $callableRefl = $this->reflectionStorage->getMethod($class, $method);
             $executableArr = array($callableRefl, $invocationObj);
         } else {
-            $executableArr = array();
+            throw new BadArgumentException(
+                'Invalid executable: callable, invokable class name or array in the form ' .
+                '[className, methodName] required'
+            );
         }
         
         return $executableArr;
@@ -459,7 +476,7 @@ class Provider implements Injector {
         
         foreach ($funcReflParamsArr as $funcParam) {
             $rawParamKey = self::RAW_INJECTION_PREFIX . $funcParam->name;
-            
+
             if (isset($definition[$funcParam->name])) {
                 $funcArgs[] = $this->makeInternal($definition[$funcParam->name]);
             } elseif (isset($definition[$rawParamKey])) {
