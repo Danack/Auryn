@@ -660,7 +660,14 @@ class Provider implements Injector {
         } elseif ($reflParam->isDefaultValueAvailable()) {
             return $reflParam->getDefaultValue();
         } else {
-            return NULL;
+            throw new InjectionException(
+                sprintf(
+                    self::E_NON_CONCRETE_PARAMETER_WITHOUT_ALIAS_MESSAGE, 
+                    'Unknown type', 
+                    $reflParam->getName()
+                ),
+                self::E_NON_CONCRETE_PARAMETER_WITHOUT_ALIAS_CODE
+            );
         }
     }
     
