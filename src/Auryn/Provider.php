@@ -53,28 +53,28 @@ class Provider implements Injector {
     const E_SHARE_ARGUMENT_MESSAGE = '%s::share() requires a string class name or object instance at Argument 1; %s specified';
 
     const E_DELEGATE_ARGUMENT_CODE = 7;
-    const E_DELEGATE_ARGUMENT_MESSAGE = '%s::delegate expects a valid callable or provisionable executable class or method reference at Argument 2';
+    const E_DELEGATE_ARGUMENT_MESSAGE = '%s::delegate expects a valid callable or provisionable executable class or method reference at Argument 2.';
 
     const E_CALLABLE_CODE = 8;
-    const E_CALLABLE_MESSAGE = 'Invalid executable: callable, invokable class name or array in the form [className, methodName] required';
+    const E_CALLABLE_MESSAGE = 'Invalid executable: callable, invokable class name or array in the form [className, methodName] required.';
 
     const E_NON_CONCRETE_PARAMETER_WITHOUT_ALIAS_CODE = 9;
-    const E_NON_CONCRETE_PARAMETER_WITHOUT_ALIAS_MESSAGE = 'Cannot instantiate %s %s without an injection definition or implementation';
+    const E_NON_CONCRETE_PARAMETER_WITHOUT_ALIAS_MESSAGE = 'Cannot instantiate %s %s without an injection definition or implementation.';
 
     const E_BAD_IMPLEMENTATION_CODE = 10;
-    const E_BAD_IMPLEMENTATION_MESSAGE = 'Bad implementation: %s does not implement %s';
+    const E_BAD_IMPLEMENTATION_MESSAGE = 'Bad implementation: %s does not implement %s.';
 
     const E_BAD_PARAM_IMPLEMENTATION_CODE = 11;
-    const E_BAD_PARAM_IMPLEMENTATION_MESSAGE = 'Bad implementation definition encountered while attempting to provision non-concrete parameter $%s of type %s';
+    const E_BAD_PARAM_IMPLEMENTATION_MESSAGE = 'Bad implementation definition encountered while attempting to provision non-concrete parameter $%s of type %s.';
 
     const E_UNDEFINED_PARAM_CODE = 12;
-    const E_UNDEFINED_PARAM_MESSAGE = 'No definition available while attempting to provision typeless non-concrete parameter %s';
+    const E_UNDEFINED_PARAM_MESSAGE = 'No definition available while attempting to provision typeless non-concrete parameter $%s.';
 
     const E_NEEDS_DEFINITION_CODE = 13;
-    const E_NEEDS_DEFINITION_MESSAGE = 'Injection definition/implementation required for non-concrete parameter $%s of type %s';
+    const E_NEEDS_DEFINITION_MESSAGE = 'Injection definition/implementation required for non-concrete parameter $%s of type %s.';
 
     const E_CYCLIC_DEPENDENCY_CODE = 14;
-    const E_CYCLIC_DEPENDENCY_MESSAGE = 'Detected a cyclic dependency while provisioning %s';
+    const E_CYCLIC_DEPENDENCY_MESSAGE = 'Detected a cyclic dependency while provisioning class %s.';
 
     function __construct(ReflectionStorage $reflectionStorage = NULL) {
         $this->reflectionStorage = $reflectionStorage ?: new ReflectionPool;
@@ -90,7 +90,19 @@ class Provider implements Injector {
      */
     function make($className, array $customDefinition = array()) {
         $this->classHierarchy = array();
-        return $this->makeInternal($className, $customDefinition);
+        $this->beingProvisioned = array();
+        
+        try{
+            return $this->makeInternal($className, $customDefinition);
+        }
+        catch (InjectionException $e) {
+            $classConstructorChain = implode(', ', $this->classHierarchy);
+            throw new InjectionException(
+                $e->getMessage()." Constructor chain is ".$classConstructorChain,
+                $e->getCode(),
+                $e
+            );
+        }
     }
 
     /**
@@ -109,7 +121,7 @@ class Provider implements Injector {
         $lowClassBackup = $lowClass;
 
         if (isset($this->beingProvisioned[$lowClass])) {
-            throw new InjectionException(
+            throw new CyclicDependencyException(
                 sprintf(self::E_CYCLIC_DEPENDENCY_MESSAGE, $className),
                 self::E_CYCLIC_DEPENDENCY_CODE
             );
@@ -147,19 +159,19 @@ class Provider implements Injector {
                 self::E_MAKE_FAILURE_CODE,
                 $e
             );
-        } catch(InjectionException $e) {
-            unset($this->beingProvisioned[$lowClass]);
-            if ($e->getCode() === self::E_CYCLIC_DEPENDENCY_CODE) {
-                $sameCyclicClass = sprintf(self::E_DELEGATION_FAILURE_MESSAGE, $className) === $e->getMessage();
-                if (!$sameCyclicClass) {
-                    throw new InjectionException(
-                        sprintf(self::E_CYCLIC_DEPENDENCY_MESSAGE, $className),
-                        self::E_CYCLIC_DEPENDENCY_CODE,
-                        $e
-                    );
-                }
-            }
-            throw $e;
+//        } catch(InjectionException $e) {
+//            unset($this->beingProvisioned[$lowClass]);
+//            if ($e->getCode() === self::E_CYCLIC_DEPENDENCY_CODE) {
+//                $sameCyclicClass = sprintf(self::E_DELEGATION_FAILURE_MESSAGE, $className) === $e->getMessage();
+//                if (!$sameCyclicClass) {
+//                    throw new InjectionException(
+//                        sprintf(self::E_CYCLIC_DEPENDENCY_MESSAGE, $className),
+//                        self::E_CYCLIC_DEPENDENCY_CODE,
+//                        $e
+//                    );
+//                }
+//            }
+//            throw $e;
         }
         //TODO finally would require php 5.5
         //finally {
@@ -339,10 +351,6 @@ class Provider implements Injector {
             $this->setSharedInstance($className, $classNameOrInstance, $chainClassConstructors);
         } else {
             throw new BadArgumentException(
-
-//                get_class($this).'::share() requires a string class name or object instance at ' .
-//                'Argument 1; ' . $parameterType . ' specified'
-
                 sprintf(self::E_SHARE_ARGUMENT_MESSAGE, __CLASS__, gettype($classNameOrInstance)),
                 self::E_SHARE_ARGUMENT_CODE
             );
@@ -361,7 +369,6 @@ class Provider implements Injector {
 
         if (array_key_exists($lowClass, $this->sharedClasses) == false){
             $this->sharedClasses[$lowClass] = null;
-            //$this->sharedClasses[$lowClass] = new ShareInfoCollection($lowClass);
         }   
     }
 
@@ -654,6 +661,9 @@ class Provider implements Injector {
     }
     
     private function buildArgumentFromTypeHint(\ReflectionFunctionAbstract $reflFunc, \ReflectionParameter $reflParam) {
+        
+      
+        
         $typeHint = $this->reflectionStorage->getParamTypeHint($reflFunc, $reflParam);
           
         if ($typeHint && ($this->isInstantiable($typeHint) || $this->delegateExists($typeHint))) {
@@ -672,15 +682,7 @@ class Provider implements Injector {
 
     private function buildAbstractTypehintParam($typehint, \ReflectionParameter $reflParam) {
         if ($this->isImplemented($typehint)) {
-            try {
-                return $this->buildImplementation($typehint);
-            } catch (InjectionException $e) {
-                throw new InjectionException(
-                    sprintf(self::E_BAD_PARAM_IMPLEMENTATION_MESSAGE, $reflParam->getName(), $typehint),
-                    self::E_BAD_PARAM_IMPLEMENTATION_CODE,
-                    $e
-                );
-            }
+            return $this->buildImplementation($typehint);
         } elseif ($reflParam->isDefaultValueAvailable()) {
             return $reflParam->getDefaultValue();
         }
