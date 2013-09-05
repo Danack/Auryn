@@ -141,6 +141,12 @@ class InaccessibleStaticExecutableClassMethod {
     }
 }
 
+class ClassWithStaticMethodThatTakesArg {
+    static function doSomething($arg) {
+        return 1 + $arg;
+    }
+}
+
 class RecursiveClass1 {
     function __construct(RecursiveClass2 $dep) {}
 }
@@ -149,6 +155,21 @@ class RecursiveClass2 {
     function __construct(RecursiveClass1 $dep) {}
 }
 
+class RecursiveClassA {
+    function __construct(RecursiveClassB $b) {}
+}
+
+class RecursiveClassB {
+    function __construct(RecursiveClassC $c) {}
+}
+
+class RecursiveClassC {
+    function __construct(RecursiveClassA $a) {}
+}
+
+class DependsOnCyclic {
+    function __construct(RecursiveClassA $a) {}
+}
 
 interface SharedAliasedInterface {
     function foo();
@@ -245,6 +266,18 @@ class RequiresInterface {
     public function __construct(DepInterface $dep) {
         $this->testDep = $dep;
     }
+}
+
+class ClassInnerA {
+    public $dep;
+    function __construct(ClassInnerB $dep) {$this->dep = $dep;}
+}
+class ClassInnerB {
+    function __construct() {}
+}
+class ClassOuter {
+    public $dep;
+    function __construct(ClassInnerA $dep) {$this->dep = $dep;}
 }
 
 class ProvTestNoDefinitionNullDefaultClass {
@@ -398,5 +431,12 @@ class RequiresDelegatedInterface {
 class TestMissingDependency {
  
     function __construct(TypoInTypehint $class) {        
+    }
+}
+
+class NonConcreteDependencyWithDefaultValue {
+    public $interface;
+    function __construct(DelegatableInterface $i = NULL) {
+        $this->interface = $i;
     }
 }

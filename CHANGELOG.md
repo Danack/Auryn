@@ -1,3 +1,30 @@
+#### master
+
+- `Provider::execute()` and `Provider::getExecutable()` now accept string
+  arguments for both instance and static class methods e.g.:
+
+```
+MyClass::myMethod
+MyClass::myStaticMethod
+ChildOfMyClass::parent::myStaticMethod
+MyClassWithConstructorDependencies::myMethod
+```
+
+
+#### v0.9.1
+
+- Fixed a bug in ReflectionPool where it would retrieve the incorrect cache
+  in some cases (@morrisonlevi)
+- Now detects cyclic dependencies and throws an exception before you run out
+  of stack or memory (@morrisonlevi)
+- Cleaned up error messages in InjectionBuilder and Provider (@morrisonlevi)
+- Simplified some behavior in InjectorBuilder, partly for better tooling
+  support (@morrisonlevi)
+- `Injector::unshare()` now accepts object instances in addition to string
+  class names. The class of the passed object is used as the class name to be
+  unshared.
+
+
 v0.9.0
 ================================================================================
 - Added `Injector::getExecutable()` for generating callables from any valid
