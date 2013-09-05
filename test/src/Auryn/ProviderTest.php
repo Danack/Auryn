@@ -55,7 +55,7 @@ class ProviderTest extends PHPUnit_Framework_TestCase {
     public function testMakeThrowsExceptionOnNonConcreteCtorParamWithBadAlias() {
         $this->setExpectedException(
             'Auryn\\InjectionException',
-            sprintf(Provider::E_BAD_PARAM_IMPLEMENTATION_MESSAGE, 'interface', 'DepInterface'),
+            sprintf(Provider::E_BAD_PARAM_IMPLEMENTATION_MESSAGE, 'dep', 'DepInterface'),
             Provider::E_BAD_PARAM_IMPLEMENTATION_CODE
         );
 
@@ -130,7 +130,10 @@ class ProviderTest extends PHPUnit_Framework_TestCase {
         $this->assertEquals(NULL, $obj->testParam);
     }
 
-    public function testMakeInjectsNullOnUntypehintedParameterWithoutDefinitionOrDefault() {
+    /**
+     * @expectedException Auryn\InjectionException
+     */
+    public function testMakeThrowsExceptionOnUntypehintedParameterWithoutDefinitionOrDefault() {
         $provider  = new Provider(new ReflectionPool);
         $obj = $provider->make('ProviderTestCtorParamWithNoTypehintOrDefault');
         $this->assertNull($obj->val);

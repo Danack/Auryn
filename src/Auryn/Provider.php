@@ -65,12 +65,15 @@ class Provider implements Injector {
     const E_BAD_IMPLEMENTATION_MESSAGE = 'Bad implementation: %s does not implement %s';
 
     const E_BAD_PARAM_IMPLEMENTATION_CODE = 11;
-    const E_BAD_PARAM_IMPLEMENTATION_MESSAGE = 'Bad implementation definition encountered while attempting to provision non-concrete parameter \$$paramName of type $typehint';
+    const E_BAD_PARAM_IMPLEMENTATION_MESSAGE = 'Bad implementation definition encountered while attempting to provision non-concrete parameter $%s of type %s';
 
-    const E_NEEDS_DEFINITION_CODE = 12;
+    const E_UNDEFINED_PARAM_CODE = 12;
+    const E_UNDEFINED_PARAM_MESSAGE = 'No definition available while attempting to provision typeless non-concrete parameter %s';
+
+    const E_NEEDS_DEFINITION_CODE = 13;
     const E_NEEDS_DEFINITION_MESSAGE = 'Injection definition/implementation required for non-concrete parameter $%s of type %s';
 
-    const E_CYCLIC_DEPENDENCY_CODE = 13;
+    const E_CYCLIC_DEPENDENCY_CODE = 14;
     const E_CYCLIC_DEPENDENCY_MESSAGE = 'Detected a cyclic dependency while provisioning %s';
 
     function __construct(ReflectionStorage $reflectionStorage = NULL) {
@@ -660,17 +663,20 @@ class Provider implements Injector {
         } elseif ($reflParam->isDefaultValueAvailable()) {
             return $reflParam->getDefaultValue();
         } else {
-            return NULL;
+            throw new InjectionException(
+                sprintf(self::E_UNDEFINED_PARAM_MESSAGE, $reflParam->getName()),
+                self::E_UNDEFINED_PARAM_CODE
+            );
         }
     }
-    
+
     private function buildAbstractTypehintParam($typehint, \ReflectionParameter $reflParam) {
         if ($this->isImplemented($typehint)) {
             try {
                 return $this->buildImplementation($typehint);
             } catch (InjectionException $e) {
                 throw new InjectionException(
-                    sprintf(self::E_BAD_PARAM_IMPLEMENTATION_MESSAGE, $reflParam, $typehint),
+                    sprintf(self::E_BAD_PARAM_IMPLEMENTATION_MESSAGE, $reflParam->getName(), $typehint),
                     self::E_BAD_PARAM_IMPLEMENTATION_CODE,
                     $e
                 );
