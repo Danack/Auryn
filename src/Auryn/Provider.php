@@ -22,7 +22,7 @@ class Provider implements Injector {
      */
     private $sharedClasses = array();
 
-    private $classHierarchy = array();
+    private $chainClassConstructors = array();
     
     private $aliases = array();
     
@@ -89,17 +89,20 @@ class Provider implements Injector {
      * @return mixed A dependency-injected object
      */
     function make($className, array $customDefinition = array()) {
-        $this->classHierarchy = array();
+        $this->chainClassConstructors = array();
         $this->beingProvisioned = array();
         
         try{
             return $this->makeInternal($className, $customDefinition);
         }
-        catch (InjectionException $e) {
-            $classConstructorChain = implode(', ', $this->classHierarchy);
+        catch (CyclicDependencyException $e) {
+            // If you hate the extra Exception class, this could be replaced with 
+            // catch (InjectionException $e) {
+            // if $e->getcode() == E_CYCLIC_DEPENDENCY_CODE) {
             throw new InjectionException(
-                $e->getMessage()." Constructor chain is ".$classConstructorChain,
+                sprintf(self::E_CYCLIC_DEPENDENCY_MESSAGE, $className),
                 $e->getCode(),
+                $this->chainClassConstructors,
                 $e
             );
         }
@@ -115,11 +118,12 @@ class Provider implements Injector {
      */
     private function makeInternal($className, array $customDefinition = array()) {
 
-        array_push($this->classHierarchy, $className);
+        array_push($this->chainClassConstructors, $className);
         
         $lowClass = strtolower($className);
         $lowClassBackup = $lowClass;
 
+        //TODO - remove beingProvisioned and use in_array($this->chainClassConstructors)
         if (isset($this->beingProvisioned[$lowClass])) {
             throw new CyclicDependencyException(
                 sprintf(self::E_CYCLIC_DEPENDENCY_MESSAGE, $className),
@@ -140,7 +144,7 @@ class Provider implements Injector {
             
             $sharedInstance = null;
             if (isset($this->sharedClasses[$lowClass]) == true) {
-                $sharedInstance = $this->sharedClasses[$lowClass]->getSharedDefinition($this->classHierarchy);
+                $sharedInstance = $this->sharedClasses[$lowClass]->getSharedDefinition($this->chainClassConstructors);
             }
             
             if ($sharedInstance != null) {
@@ -157,6 +161,7 @@ class Provider implements Injector {
             throw new InjectionException(
                 sprintf(self::E_MAKE_FAILURE_MESSAGE, $className, $e->getMessage()),
                 self::E_MAKE_FAILURE_CODE,
+                $this->chainClassConstructors,
                 $e
             );
 //        } catch(InjectionException $e) {
@@ -187,7 +192,7 @@ class Provider implements Injector {
             }
         }
 
-        array_pop($this->classHierarchy);
+        array_pop($this->chainClassConstructors);
         unset($this->beingProvisioned[$lowClassBackup]);
 
         return $provisionedObject;
@@ -204,6 +209,7 @@ class Provider implements Injector {
             throw new InjectionException(
                 sprintf(self::E_DELEGATION_FAILURE_MESSAGE, $class),
                 self::E_DELEGATION_FAILURE_CODE,
+                $this->chainClassConstructors,
                 $e
             );
         }
@@ -211,7 +217,8 @@ class Provider implements Injector {
         if (!($provisionedObject instanceof $class)) {
             throw new InjectionException(
                 sprintf(self::E_INVALID_CLASS_MESSAGE, $class, get_class($provisionedObject)),
-                self::E_INVALID_CLASS_CODE
+                self::E_INVALID_CLASS_CODE,
+                $this->chainClassConstructors
             );
         }
         
@@ -236,6 +243,7 @@ class Provider implements Injector {
             throw new InjectionException(
                 sprintf(self::E_CLASS_NOT_FOUND_MESSAGE, $className),
                 self::E_CLASS_NOT_FOUND_CODE,
+                $this->chainClassConstructors,
                 $e
             );
         }
@@ -245,7 +253,7 @@ class Provider implements Injector {
         $lowClass = strtolower($className);
         
         if ($this->isDefined($lowClass)) {
-            return $this->injectionDefinitions[$lowClass]->getInjectionDefinition($this->classHierarchy);
+            return $this->injectionDefinitions[$lowClass]->getInjectionDefinition($this->chainClassConstructors);
         } else {
             return array();
         }
@@ -605,6 +613,7 @@ class Provider implements Injector {
             throw new InjectionException(
                 sprintf(self::E_CLASS_NOT_FOUND_MESSAGE, $className),
                 self::E_CLASS_NOT_FOUND_CODE,
+                $this->chainClassConstructors,
                 $e
             );
         }
@@ -629,7 +638,8 @@ class Provider implements Injector {
             $type = $reflectionClass->isInterface() ? 'interface' : 'abstract';
             throw new InjectionException(
                 sprintf(self::E_NON_CONCRETE_PARAMETER_WITHOUT_ALIAS_MESSAGE, $type, $className),
-                self::E_NON_CONCRETE_PARAMETER_WITHOUT_ALIAS_CODE
+                self::E_NON_CONCRETE_PARAMETER_WITHOUT_ALIAS_CODE,
+                $this->chainClassConstructors
             );
         }
     }
@@ -651,7 +661,7 @@ class Provider implements Injector {
         $implRefl  = $this->reflectionStorage->getClass($implClass);
         
         if (!$implRefl->isSubclassOf($interfaceOrAbstractName)) {
-            throw new InjectionException(
+            throw new BadArgumentException(
                 sprintf(self::E_BAD_IMPLEMENTATION_MESSAGE, $implRefl->name, $interfaceOrAbstractName),
                 self::E_BAD_IMPLEMENTATION_CODE
             );
@@ -661,11 +671,9 @@ class Provider implements Injector {
     }
     
     private function buildArgumentFromTypeHint(\ReflectionFunctionAbstract $reflFunc, \ReflectionParameter $reflParam) {
-        
-      
-        
+
         $typeHint = $this->reflectionStorage->getParamTypeHint($reflFunc, $reflParam);
-          
+
         if ($typeHint && ($this->isInstantiable($typeHint) || $this->delegateExists($typeHint))) {
             return $this->makeInternal($typeHint);
         } elseif ($typeHint) {
@@ -675,21 +683,33 @@ class Provider implements Injector {
         } else {
             throw new InjectionException(
                 sprintf(self::E_UNDEFINED_PARAM_MESSAGE, $reflParam->getName()),
-                self::E_UNDEFINED_PARAM_CODE
+                self::E_UNDEFINED_PARAM_CODE,
+                $this->chainClassConstructors
             );
         }
     }
 
     private function buildAbstractTypehintParam($typehint, \ReflectionParameter $reflParam) {
         if ($this->isImplemented($typehint)) {
-            return $this->buildImplementation($typehint);
+
+            try {
+                return $this->buildImplementation($typehint);
+            } catch (BadArgumentException $e) {
+                throw new InjectionException(
+                    sprintf(self::E_BAD_PARAM_IMPLEMENTATION_MESSAGE, $reflParam->getName(), $typehint),
+                    self::E_BAD_PARAM_IMPLEMENTATION_CODE,
+                    $this->chainClassConstructors,
+                    $e
+                );
+            }
         } elseif ($reflParam->isDefaultValueAvailable()) {
             return $reflParam->getDefaultValue();
         }
         
         throw new InjectionException(
             sprintf(self::E_NEEDS_DEFINITION_MESSAGE, $reflParam->getName(), $typehint),
-            self::E_NEEDS_DEFINITION_CODE
+            self::E_NEEDS_DEFINITION_CODE,
+            $this->chainClassConstructors
         );
     }
 }

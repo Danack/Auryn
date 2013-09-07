@@ -711,20 +711,20 @@ class ProviderTest extends PHPUnit_Framework_TestCase {
     //TODO - add another test regarding creating multiple shared objects.
     //TODO - add alias + hierarchical sharing test
 
-    public function testSharingAliasedClass() {
-
-        $this->markTestIncomplete(
-            'This test is not run, as the correct behaviour is not defined.'
-        );
-        return;
-        
-        $provider = new Auryn\Provider();
-        $testClass = new TestSharingClass();
-        $provider->alias('TestSharingClass', 'AliasedTestSharingClass');
-        $provider->share($testClass);
-        $instance = $provider->make('TestSharingClass');
-        $this->assertInstanceOf('AliasedTestSharingClass', $instance);
-    }
+//    public function testSharingAliasedClass() {
+//
+//        $this->markTestIncomplete(
+//            'This test is not run, as the correct behaviour is not defined.'
+//        );
+//        return;
+//        
+//        $provider = new Auryn\Provider();
+//        $testClass = new TestSharingClass();
+//        $provider->alias('TestSharingClass', 'AliasedTestSharingClass');
+//        $provider->share($testClass);
+//        $instance = $provider->make('TestSharingClass');
+//        $this->assertInstanceOf('AliasedTestSharingClass', $instance);
+//    }
 
     /**
      * @dataProvider provideInaccessibleExecutables
