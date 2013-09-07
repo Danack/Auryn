@@ -800,27 +800,27 @@ class ProviderTest extends PHPUnit_Framework_TestCase {
 
     function provideCyclicDependencies() {
         return array(
-            'RecursiveClassA' => array('RecursiveClassA'),
-            'RecursiveClassB' => array('RecursiveClassB'),
-            'RecursiveClassC' => array('RecursiveClassC'),
-            'RecursiveClass1' => array('RecursiveClass1'),
-            'RecursiveClass2' => array('RecursiveClass2'),
-            'DependsOnCyclic' => array('DependsOnCyclic'),
+            array('RecursiveClassA', 'RecursiveClassA'),
+            array('RecursiveClassB', 'RecursiveClassB'),
+            array('RecursiveClassC', 'RecursiveClassC'),
+            array('RecursiveClass1', 'RecursiveClass1'),
+            array('RecursiveClass2', 'RecursiveClass2'),
+            array('DependsOnCyclic', 'RecursiveClassA'),
         );
     }
 
     /**
      * @dataProvider provideCyclicDependencies
      */
-    function testCyclicDependencies($class) {
+    function testCyclicDependencies($classToMake, $classWithCyclicDependency) {
         $this->setExpectedException(
             'Auryn\\InjectionException',
-            sprintf(Provider::E_CYCLIC_DEPENDENCY_MESSAGE, $class),
+            sprintf(Provider::E_CYCLIC_DEPENDENCY_MESSAGE, $classWithCyclicDependency),
             Provider::E_CYCLIC_DEPENDENCY_CODE
         );
 
         $provider = new Provider;
-        $provider->make($class);
+        $provider->make($classToMake);
     }
 
     function testNonConcreteDependencyWithDefaultValue() {

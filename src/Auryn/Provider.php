@@ -92,20 +92,22 @@ class Provider implements Injector {
         $this->chainClassConstructors = array();
         $this->beingProvisioned = array();
         
-        try{
+        //I don't think it's is neccessary but it's possible to change the class name
+        //In the first part of the exception.
+//        try{
             return $this->makeInternal($className, $customDefinition);
-        }
-        catch (CyclicDependencyException $e) {
-            // If you hate the extra Exception class, this could be replaced with 
-            // catch (InjectionException $e) {
-            // if $e->getcode() == E_CYCLIC_DEPENDENCY_CODE) {
-            throw new InjectionException(
-                sprintf(self::E_CYCLIC_DEPENDENCY_MESSAGE, $className),
-                $e->getCode(),
-                $this->chainClassConstructors,
-                $e
-            );
-        }
+//        }
+//        catch (InjectionException $e) {
+//            if ($e->getcode() == E_CYCLIC_DEPENDENCY_CODE) {
+//                throw new InjectionException(
+//                    sprintf(self::E_CYCLIC_DEPENDENCY_MESSAGE, $className),
+//                    $e->getCode(),
+//                    $this->chainClassConstructors,
+//                    $e
+//                );
+//            }
+//            throw $e;
+//        }
     }
 
     /**
@@ -125,9 +127,10 @@ class Provider implements Injector {
 
         //TODO - remove beingProvisioned and use in_array($this->chainClassConstructors)
         if (isset($this->beingProvisioned[$lowClass])) {
-            throw new CyclicDependencyException(
+            throw new InjectionException(
                 sprintf(self::E_CYCLIC_DEPENDENCY_MESSAGE, $className),
-                self::E_CYCLIC_DEPENDENCY_CODE
+                self::E_CYCLIC_DEPENDENCY_CODE,
+                $this->chainClassConstructors
             );
         }
         $this->beingProvisioned[$lowClass] = TRUE;
@@ -164,19 +167,6 @@ class Provider implements Injector {
                 $this->chainClassConstructors,
                 $e
             );
-//        } catch(InjectionException $e) {
-//            unset($this->beingProvisioned[$lowClass]);
-//            if ($e->getCode() === self::E_CYCLIC_DEPENDENCY_CODE) {
-//                $sameCyclicClass = sprintf(self::E_DELEGATION_FAILURE_MESSAGE, $className) === $e->getMessage();
-//                if (!$sameCyclicClass) {
-//                    throw new InjectionException(
-//                        sprintf(self::E_CYCLIC_DEPENDENCY_MESSAGE, $className),
-//                        self::E_CYCLIC_DEPENDENCY_CODE,
-//                        $e
-//                    );
-//                }
-//            }
-//            throw $e;
         }
         //TODO finally would require php 5.5
         //finally {
