@@ -7,7 +7,7 @@ namespace Auryn;
  */
 class InjectionException extends \RuntimeException {
 
-    public function __construct($message = "", $code = 0, array $classConstructorChain = array(), \Exception $previous = null) {
+    public function __construct(array $classConstructorChain = array(), $message = "", $code = 0, \Exception $previous = NULL) {
     
         if (count($classConstructorChain) > 0) {
             $message .= " Constructor chain is ".implode('->', $classConstructorChain);

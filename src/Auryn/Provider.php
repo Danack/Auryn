@@ -128,9 +128,9 @@ class Provider implements Injector {
         //TODO - remove beingProvisioned and use in_array($this->chainClassConstructors)
         if (isset($this->beingProvisioned[$lowClass])) {
             throw new InjectionException(
-                sprintf(self::E_CYCLIC_DEPENDENCY_MESSAGE, $className),
-                self::E_CYCLIC_DEPENDENCY_CODE,
-                $this->chainClassConstructors
+                $this->chainClassConstructors, 
+                sprintf(self::E_CYCLIC_DEPENDENCY_MESSAGE, $className), 
+                self::E_CYCLIC_DEPENDENCY_CODE
             );
         }
         $this->beingProvisioned[$lowClass] = TRUE;
@@ -162,9 +162,10 @@ class Provider implements Injector {
         } catch(\ReflectionException $e){
             unset($this->beingProvisioned[$lowClass]);
             throw new InjectionException(
-                sprintf(self::E_MAKE_FAILURE_MESSAGE, $className, $e->getMessage()),
-                self::E_MAKE_FAILURE_CODE,
-                $this->chainClassConstructors,
+                $this->chainClassConstructors, 
+                sprintf(self::E_MAKE_FAILURE_MESSAGE, $className, 
+                $e->getMessage()), 
+                self::E_MAKE_FAILURE_CODE, 
                 $e
             );
         }
@@ -197,18 +198,18 @@ class Provider implements Injector {
             $provisionedObject = $this->execute($callable[0], $callable[1]);
         } catch (\Exception $e) {
             throw new InjectionException(
-                sprintf(self::E_DELEGATION_FAILURE_MESSAGE, $class),
-                self::E_DELEGATION_FAILURE_CODE,
-                $this->chainClassConstructors,
+                $this->chainClassConstructors, 
+                sprintf(self::E_DELEGATION_FAILURE_MESSAGE, $class), 
+                self::E_DELEGATION_FAILURE_CODE, 
                 $e
             );
         }
 
         if (!($provisionedObject instanceof $class)) {
             throw new InjectionException(
-                sprintf(self::E_INVALID_CLASS_MESSAGE, $class, get_class($provisionedObject)),
-                self::E_INVALID_CLASS_CODE,
-                $this->chainClassConstructors
+                $this->chainClassConstructors, 
+                sprintf(self::E_INVALID_CLASS_MESSAGE, $class, get_class($provisionedObject)), 
+                self::E_INVALID_CLASS_CODE
             );
         }
         
@@ -231,9 +232,9 @@ class Provider implements Injector {
             }
         } catch (\ReflectionException $e) {
             throw new InjectionException(
-                sprintf(self::E_CLASS_NOT_FOUND_MESSAGE, $className),
-                self::E_CLASS_NOT_FOUND_CODE,
-                $this->chainClassConstructors,
+                $this->chainClassConstructors, 
+                sprintf(self::E_CLASS_NOT_FOUND_MESSAGE, $className), 
+                self::E_CLASS_NOT_FOUND_CODE, 
                 $e
             );
         }
@@ -601,9 +602,9 @@ class Provider implements Injector {
             $ctorParams = $this->reflectionStorage->getConstructorParameters($className);
         } catch (\ReflectionException $e) {
             throw new InjectionException(
-                sprintf(self::E_CLASS_NOT_FOUND_MESSAGE, $className),
-                self::E_CLASS_NOT_FOUND_CODE,
-                $this->chainClassConstructors,
+                $this->chainClassConstructors, 
+                sprintf(self::E_CLASS_NOT_FOUND_MESSAGE, $className), 
+                self::E_CLASS_NOT_FOUND_CODE, 
                 $e
             );
         }
@@ -627,9 +628,9 @@ class Provider implements Injector {
             $reflectionClass = $this->reflectionStorage->getClass($className);
             $type = $reflectionClass->isInterface() ? 'interface' : 'abstract';
             throw new InjectionException(
+                $this->chainClassConstructors, 
                 sprintf(self::E_NON_CONCRETE_PARAMETER_WITHOUT_ALIAS_MESSAGE, $type, $className),
-                self::E_NON_CONCRETE_PARAMETER_WITHOUT_ALIAS_CODE,
-                $this->chainClassConstructors
+                self::E_NON_CONCRETE_PARAMETER_WITHOUT_ALIAS_CODE
             );
         }
     }
@@ -680,9 +681,10 @@ class Provider implements Injector {
             return $reflParam->getDefaultValue();
         } else {
             throw new InjectionException(
-                sprintf(self::E_UNDEFINED_PARAM_MESSAGE, $reflParam->getName()),
-                self::E_UNDEFINED_PARAM_CODE,
-                $this->chainClassConstructors
+                $this->chainClassConstructors, 
+                sprintf(self::E_UNDEFINED_PARAM_MESSAGE, 
+                $reflParam->getName()), 
+                self::E_UNDEFINED_PARAM_CODE
             );
         }
     }
@@ -694,9 +696,9 @@ class Provider implements Injector {
                 return $this->buildImplementation($typehint);
             } catch (BadArgumentException $e) {
                 throw new InjectionException(
+                    $this->chainClassConstructors, 
                     sprintf(self::E_BAD_PARAM_IMPLEMENTATION_MESSAGE, $reflParam->getName(), $typehint),
-                    self::E_BAD_PARAM_IMPLEMENTATION_CODE,
-                    $this->chainClassConstructors,
+                    self::E_BAD_PARAM_IMPLEMENTATION_CODE, 
                     $e
                 );
             }
@@ -705,9 +707,9 @@ class Provider implements Injector {
         }
         
         throw new InjectionException(
-            sprintf(self::E_NEEDS_DEFINITION_MESSAGE, $reflParam->getName(), $typehint),
-            self::E_NEEDS_DEFINITION_CODE,
-            $this->chainClassConstructors
+            $this->chainClassConstructors, 
+            sprintf(self::E_NEEDS_DEFINITION_MESSAGE, $reflParam->getName(), $typehint), 
+            self::E_NEEDS_DEFINITION_CODE
         );
     }
 }
