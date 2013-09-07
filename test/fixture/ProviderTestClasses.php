@@ -286,10 +286,19 @@ class ProvTestNoDefinitionNullDefaultClass {
     }
 }
 
-class ProviderTestCtorParamWithNoTypehintOrDefault {
+interface TestMissingDefine {}
+
+class ProviderTestCtorParamWithNoTypehintOrDefault implements TestMissingDefine {
     public $val = 42;
     public function __construct($val) {
         $this->val = $val;
+    }
+}
+
+class ProviderTestCtorParamWithNoTypehintOrDefaultDependent {
+    private $param;
+    function __construct(TestMissingDefine $param) {
+        $this->param = $param;
     }
 }
 
@@ -300,14 +309,16 @@ class ProviderTestRawCtorParams {
     public $array;
     public $float;
     public $bool;
+    public $null;
     
-    public function __construct($string, $obj, $int, $array, $float, $bool) {
+    public function __construct($string, $obj, $int, $array, $float, $bool, $null) {
         $this->string = $string;
         $this->obj = $obj;
         $this->int = $int;
         $this->array = $array;
         $this->float = $float;
         $this->bool = $bool;
+        $this->null = $null;
     }
 }
 
