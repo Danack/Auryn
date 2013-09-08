@@ -557,10 +557,25 @@ class ProviderTest extends PHPUnit_Framework_TestCase {
 
     public function testInterfaceFactoryDelegation() {
         $injector = new Auryn\Provider(new Auryn\ReflectionPool);
+        $injector->define('ImplementsInterfaceFactory', array(':arg1' => 'First argument'));
         $injector->delegate('DelegatableInterface', 'ImplementsInterfaceFactory');
         $requiresDelegatedInterface = $injector->make('RequiresDelegatedInterface');
         $requiresDelegatedInterface->foo();
     }
+
+    public function testInterfaceFactoryDelegationMissingDefine() {
+        $this->setExpectedException(
+            'Auryn\\InjectionException',
+            sprintf(Provider::E_UNDEFINED_PARAM_MESSAGE, 'arg1'),
+            Provider::E_UNDEFINED_PARAM_CODE
+        );
+
+        $injector = new Auryn\Provider(new Auryn\ReflectionPool);
+        $injector->delegate('DelegatableInterface', 'ImplementsInterfaceFactory');
+        $requiresDelegatedInterface = $injector->make('RequiresDelegatedInterface');
+        $requiresDelegatedInterface->foo();
+    }
+    
 
     /**
      * @expectedException Auryn\InjectionException

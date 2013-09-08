@@ -300,7 +300,7 @@ class ImplementsInterface implements DelegatableInterface{
 }
 
 class ImplementsInterfaceFactory{
-    public function __invoke() {
+    public function __invoke($arg1) {
         return new ImplementsInterface();
     }
 }
