@@ -12,14 +12,10 @@ class Provider implements Injector {
 
     const RAW_INJECTION_PREFIX = ':';
 
-    /**
-     * @var InjectionInfoCollection[]
-     */
+    /** @var InjectionInfoCollection[]  */
     private $injectionDefinitions = array();
     private $aliases = array();
-    /**
-     * @var ShareInfoCollection[]
-     */
+    /** @var ShareInfoCollection[]  */
     private $sharedClasses = array();
     private $classHierarchy = array();
     private $delegatedClasses = array();
