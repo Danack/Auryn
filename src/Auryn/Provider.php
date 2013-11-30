@@ -12,9 +12,12 @@ class Provider implements Injector {
 
     const RAW_INJECTION_PREFIX = ':';
 
+    /** @var InjectionInfoCollection[]  */
     private $injectionDefinitions = array();
     private $aliases = array();
+    /** @var ShareInfoCollection[]  */
     private $sharedClasses = array();
+    private $classHierarchy = array();
     private $delegatedClasses = array();
     private $reflectionStorage;
     private $beingProvisioned = array();
@@ -87,7 +90,23 @@ class Provider implements Injector {
      * @return mixed A dependency-injected object
      */
     function make($className, array $customDefinition = array()) {
+        $this->classHierarchy = array();
+        return $this->makeInternal($className, $customDefinition);
+    }
+
+
+    /**
+     * Instantiate a class according to a predefined or call-time injection definition
+     *
+     * @param string $className Class name
+     * @param array  $customDefinition An optional array of custom instantiation parameters
+     * @throws \Auryn\InjectionException
+     * @return mixed A dependency-injected object
+     */
+    function makeInternal($className, array $customDefinition = array()) {
         $lowClass = strtolower($className);
+
+        array_push($this->classHierarchy, $className);
 
         if (isset($this->aliases[$lowClass])) {
             $className = $this->aliases[$lowClass];
@@ -99,8 +118,13 @@ class Provider implements Injector {
         // isset() is used specifically here instead of $this->isShared() because classes may be
         // marked as "shared" before an instance is stored. In these cases the class is "shared,"
         // but it has a NULL value and instantiation is needed.
-        if (isset($this->sharedClasses[$lowClass])) {
-            $provisionedObject = $this->sharedClasses[$lowClass];
+        $sharedInstance = NULL;
+        if (isset($this->sharedClasses[$lowClass]) == true) {
+            $sharedInstance = $this->sharedClasses[$lowClass]->getSharedDefinition($this->classHierarchy);
+        }
+
+        if ($sharedInstance != NULL) {
+            $provisionedObject = $sharedInstance;
         } elseif (isset($this->delegatedClasses[$lowClass])) {
             $provisionedObject = $this->provisionFromDelegate($className);
         } else {
@@ -108,7 +132,10 @@ class Provider implements Injector {
         }
 
         if ($this->isShared($lowClass)) {
-            $this->sharedClasses[$lowClass] = $provisionedObject;
+            if ($this->sharedClasses[$lowClass] == null) {
+                $this->sharedClasses[$lowClass] = new ShareInfoCollection($lowClass);
+            }
+            $this->sharedClasses[$lowClass]->setSharedInstance($provisionedObject);
         }
 
         unset($this->beingProvisioned[$lowClass]);
@@ -193,7 +220,8 @@ class Provider implements Injector {
         $lowClass = strtolower($className);
 
         if ($this->isDefined($lowClass)) {
-            return $this->injectionDefinitions[$lowClass];
+            return $this->injectionDefinitions[$lowClass]->getInjectionDefinition($this->classHierarchy);
+
         } else {
             return array();
         }
@@ -219,10 +247,15 @@ class Provider implements Injector {
      * @throws \Auryn\BadArgumentException On missing raw injection prefix
      * @return \Auryn\Provider Returns the current instance
      */
-    function define($className, array $injectionDefinition) {
+    function define($className, array $injectionDefinition, array $chainClassConstructors = array()) {
         $this->validateInjectionDefinition($injectionDefinition);
         $lowClass = strtolower($className);
-        $this->injectionDefinitions[$lowClass] = $injectionDefinition;
+        if (array_key_exists($lowClass, $this->injectionDefinitions) == false) {
+            $this->injectionDefinitions[$lowClass] = new InjectionInfoCollection();
+        }
+
+        $this->injectionDefinitions[$lowClass]->addInjectionDefinition($injectionDefinition, $chainClassConstructors);
+
 
         return $this;
     }
@@ -273,9 +306,9 @@ class Provider implements Injector {
         $lowAlias = strtolower($alias);
 
         if (isset($this->sharedClasses[$lowTypehint])) {
-            $sharedClassName = strtolower(get_class($this->sharedClasses[$lowTypehint]));
+            //$sharedClassName = strtolower(get_class($this->sharedClasses[$lowTypehint]));
             throw new InjectionException(
-                sprintf(self::E_CANNOT_ALIAS_ALREADY_SHARED_MESSAGE, $sharedClassName, $alias),
+                sprintf(self::E_CANNOT_ALIAS_ALREADY_SHARED_MESSAGE, $lowTypehint, $alias),
                 self::E_CANNOT_ALIAS_ALREADY_SHARED_CODE
             );
         } elseif (array_key_exists($lowAlias, $this->sharedClasses)) {
@@ -308,26 +341,22 @@ class Provider implements Injector {
      * @throws \Auryn\BadArgumentException
      * @return \Auryn\Provider Returns the current instance
      */
-    function share($classNameOrInstance) {
+    function share($classNameOrInstance, array $chainClassConstructors = array()) {
         if (is_string($classNameOrInstance)) {
-            $lowClass = strtolower($classNameOrInstance);
-            $lowClass = isset($this->aliases[$lowClass])
-                ? strtolower($this->aliases[$lowClass])
-                : $lowClass;
-
-            $this->sharedClasses[$lowClass] = isset($this->sharedClasses[$lowClass])
-                ? $this->sharedClasses[$lowClass]
-                : NULL;
+            $this->setClassAsShared($classNameOrInstance);
         } elseif (is_object($classNameOrInstance)) {
-            $lowClass = strtolower(get_class($classNameOrInstance));
+            $className = get_class($classNameOrInstance);
+            $this->setClassAsShared($className);
+            $this->setSharedInstance($className, $classNameOrInstance, $chainClassConstructors);
+
+            $lowClass = strtolower($className);
             if (isset($this->aliases[$lowClass])) {
-                //You cannot share an instance of a class that has already been aliased to another class.
-                throw new InjectionException(
-                    sprintf(self::E_CANNOT_SHARE_ALREADY_ALIASED_MESSAGE, $lowClass, $this->aliases[$lowClass]),
-                    self::E_CANNOT_SHARE_ALREADY_ALIASED_CODE
-                );
-            }
-            $this->sharedClasses[$lowClass] = $classNameOrInstance;
+            //You cannot share an instance of a class that has already been aliased to another class.
+            throw new InjectionException(
+                sprintf(self::E_CANNOT_SHARE_ALREADY_ALIASED_MESSAGE, $lowClass, $this->aliases[$lowClass]),
+                self::E_CANNOT_SHARE_ALREADY_ALIASED_CODE
+            );
+        }
         } else {
             throw new BadArgumentException(
                 sprintf(self::E_SHARE_ARGUMENT_MESSAGE, __CLASS__, gettype($classNameOrInstance)),
@@ -338,6 +367,48 @@ class Provider implements Injector {
         return $this;
     }
 
+
+
+
+    function setClassAsShared($className) {
+        $lowClass = strtolower($className);
+        if (isset($this->aliases[$lowClass]) == true) {
+            $lowClass = strtolower($this->aliases[$lowClass]);
+        }
+
+        if (array_key_exists($lowClass, $this->sharedClasses) == false){
+            $this->sharedClasses[$lowClass] = null;
+            //$this->sharedClasses[$lowClass] = new ShareInfoCollection($lowClass);
+        }
+    }
+
+
+    function setSharedInstance($className, $instance, array $chainClassConstructors = array()) {
+        if (is_object($instance) == false) {
+            $parameterType = gettype($instance);
+            throw new BadArgumentException(
+                get_class($this).'::share() requires a object at ' .
+                'Argument 1; ' . $parameterType . ' specified'
+            );
+        }
+
+        $lowClass = strtolower($className);        
+        if (isset($this->aliases[$lowClass])) {
+            $lowClass = strtolower($this->aliases[$lowClass]);
+        }
+
+        if (array_key_exists($lowClass, $this->sharedClasses) == false ||
+            $this->sharedClasses[$lowClass] === null) {
+            $this->sharedClasses[$lowClass] = new ShareInfoCollection($lowClass);
+        }
+
+        $this->sharedClasses[$lowClass]->setSharedInstance($instance, $chainClassConstructors);
+        return $this;
+    }
+
+    
+    
+    
     /**
      * Unshares the specified class (or the class of the specified object)
      *
@@ -367,7 +438,7 @@ class Provider implements Injector {
         }
         $className = strtolower($classNameOrInstance);
         if (isset($this->sharedClasses[$className])) {
-            $this->sharedClasses[$className] = NULL;
+            $this->sharedClasses[$className]->clearSharedInstance();
         }
 
         return $this;
@@ -491,7 +562,7 @@ class Provider implements Injector {
             $callableRefl = $this->reflectionStorage->getFunction($stringExecutable);
             $executableArr = array($callableRefl, NULL);
         } elseif (method_exists($stringExecutable, '__invoke')) {
-            $invocationObj = $this->make($stringExecutable);
+            $invocationObj = $this->makeInternal($stringExecutable);
             $callableRefl = $this->reflectionStorage->getMethod($invocationObj, '__invoke');
             $executableArr = array($callableRefl, $invocationObj);
         } elseif (strpos($stringExecutable, '::') !== FALSE) {
@@ -521,7 +592,7 @@ class Provider implements Injector {
 
         return $reflectionMethod->isStatic()
             ? array($reflectionMethod, NULL)
-            : array($reflectionMethod, $this->make($class));
+            : array($reflectionMethod, $this->makeInternal($class));
     }
 
     private function generateInvocationArgs(\ReflectionFunctionAbstract $function, array $definition) {
@@ -534,7 +605,7 @@ class Provider implements Injector {
             $rawParamKey = self::RAW_INJECTION_PREFIX . $param->name;
 
             if (isset($definition[$param->name])) {
-                $argument = $this->make($definition[$param->name]);
+                $argument = $this->makeInternal($definition[$param->name]);
             } elseif (array_key_exists($rawParamKey, $definition)) {
                 $argument = $definition[$rawParamKey];
             } elseif (!$argument = $this->buildArgumentFromTypeHint($function, $param)) {
@@ -610,7 +681,30 @@ class Provider implements Injector {
     private function isInstantiable($className) {
         $reflectionInstance = $this->reflectionStorage->getClass($className);
 
+
         return $reflectionInstance->isInstantiable();
+    }
+
+    private function isImplemented($nonConcreteType) {
+        $lowNonConcrete = strtolower($nonConcreteType);
+        
+        return isset($this->aliases[$lowNonConcrete]);
+    }
+
+    private function buildImplementation($interfaceOrAbstractName) {
+        $lowClass  = strtolower($interfaceOrAbstractName);
+        $implClass = $this->aliases[$lowClass];
+        $implObj   = $this->makeInternal($implClass);
+        $implRefl  = $this->reflectionStorage->getClass($implClass);
+
+        if (!$implRefl->isSubclassOf($interfaceOrAbstractName)) {
+            throw new BadArgumentException(
+                sprintf(self::E_BAD_IMPLEMENTATION_MESSAGE, $implRefl->name, $interfaceOrAbstractName),
+                self::E_BAD_IMPLEMENTATION_CODE
+            );
+        }
+
+        return $implObj;
     }
 
     private function buildArgumentFromTypeHint(\ReflectionFunctionAbstract $function, \ReflectionParameter $param) {
@@ -623,7 +717,7 @@ class Provider implements Injector {
             || isset($this->aliases[$typeHintLower])
             || isset($this->delegatedClasses[$typeHintLower])
         ) {
-            $object = $this->make($typeHint);
+            $object = $this->makeInternal($typeHint);
         } elseif ($param->isDefaultValueAvailable()) {
             $object = $param->getDefaultValue();
         } else {

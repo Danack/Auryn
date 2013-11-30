@@ -1,5 +1,128 @@
 <?php
 
+
+class TestSharingClass{
+}
+
+class AliasedTestSharingClass {
+}
+
+
+class Logger {
+
+    private $logLevel;
+    
+    function __construct($logLevel) {
+        $this->logLevel = $logLevel;
+    }
+
+    function getLogLevel(){
+        return $this->logLevel;
+    }
+
+    public function info($message, array $context = array()){}
+    public function warning($message, array $context = array()){}
+}
+
+class RequiresLoggerDependency1{
+
+    public $logger;
+    
+    function __construct(Logger $logger){
+        $this->logger = $logger;
+    }
+}
+
+class RequiresLogger1{
+
+    public $requiresLoggerDependency1;
+    public $logger;
+    
+    public function __construct(Logger $logger, RequiresLoggerDependency1 $requiresLoggerDependency1){
+        $this->requiresLoggerDependency1 = $requiresLoggerDependency1;
+        $this->logger = $logger;
+    }
+}
+
+
+class RequiresLoggerDependency2{
+
+    public $logger;
+
+    function __construct(Logger $logger){
+        $this->logger = $logger;
+    }
+}
+
+class RequiresLogger2{
+
+    public $requiresLoggerDependency2;
+    public $logger;
+
+    public function __construct(Logger $logger, RequiresLoggerDependency2 $requiresLoggerDependency2){
+        $this->requiresLoggerDependency2 = $requiresLoggerDependency2;
+        $this->logger = $logger;
+    }
+}
+
+
+
+
+class WidgetWithParams {
+
+    public $name = null;
+
+    function __construct($name){
+        $this->name = $name;
+    }
+}
+
+class UsesWidgetWithParams1{
+ 
+    public $widget;
+    
+    public function __construct(WidgetWithParams $widget) {
+        $this->widget = $widget;
+    }
+}
+
+class UsesWidgetWithParams2 {
+    public $widget;
+
+    public function __construct(WidgetWithParams $widget) {
+        $this->widget = $widget;
+    }
+}
+
+class UsesWidget {
+    
+    public $widget;
+    
+    public function __construct(WidgetWithParams $widget) {
+        $this->widget = $widget;
+    }
+}
+
+class UsesWidgetWithParamsOnceRemoved1 {
+
+    public $usesWidget;
+    
+    function __construct(UsesWidget $usesWidget) {
+        $this->usesWidget = $usesWidget;
+    }
+}
+
+class UsesWidgetWithParamsOnceRemoved2 {
+
+    public $usesWidget;
+
+    function __construct(UsesWidget $usesWidget) {
+        $this->usesWidget = $usesWidget;
+    }
+}
+
+
+
 class InaccessibleExecutableClassMethod {
     private function doSomethingPrivate() {
         return 42;
@@ -332,6 +455,7 @@ class NonConcreteDependencyWithDefaultValue {
         $this->interface = $i;
     }
 }
+
 
 class TypelessParameterDependency {
 

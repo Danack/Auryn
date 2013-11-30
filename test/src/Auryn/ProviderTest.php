@@ -616,6 +616,127 @@ class ProviderTest extends PHPUnit_Framework_TestCase {
         $this->assertSame($stdClass1, $stdClass2);
     }
 
+
+    public function testClassConstructorChainDefine1() {
+        $provider = new Auryn\Provider();
+
+        $widget1Name = 'parent1';
+        $widget2Name = 'parent2';
+
+        $provider->define('WidgetWithParams', array(':name' => 'parent1'), array('UsesWidgetWithParams1'));
+        $provider->define('WidgetWithParams', array(':name' => 'parent2'), array('UsesWidgetWithParams2'));
+
+        $usesWidgetWithParams1 = $provider->make('UsesWidgetWithParams1');
+        $usesWidgetWithParams2 = $provider->make('UsesWidgetWithParams2');
+        
+        $this->assertEquals($widget1Name, $usesWidgetWithParams1->widget->name);
+        $this->assertEquals($widget2Name, $usesWidgetWithParams2->widget->name);
+    }
+
+    public function testClassConstructorChainDefine2() {
+        $provider = new Auryn\Provider();
+
+        $widget1Name = 'parent1';
+        $widget2Name = 'parent2';
+
+        $provider->define('WidgetWithParams', array(':name' => 'parent1'), array('UsesWidgetWithParamsOnceRemoved1'));
+        $provider->define('WidgetWithParams', array(':name' => 'parent2'), array('UsesWidgetWithParamsOnceRemoved2'));
+
+        $usesWidgetWithParamsOnceRemoved1 = $provider->make('UsesWidgetWithParamsOnceRemoved1');
+        $usesWidgetWithParamsOnceRemoved2 = $provider->make('UsesWidgetWithParamsOnceRemoved2');
+
+        $this->assertEquals($widget1Name, $usesWidgetWithParamsOnceRemoved1->usesWidget->widget->name);
+        $this->assertEquals($widget2Name, $usesWidgetWithParamsOnceRemoved2->usesWidget->widget->name);
+    }
+
+    public function testClassConstructorChainMostSpecific() {
+        $provider = new Auryn\Provider();
+
+        $genericName = 'generic';
+        $specificName = 'specific';
+
+        $provider->define('WidgetWithParams', array(':name' => $genericName));
+        $provider->define('WidgetWithParams', array(':name' => $specificName), array('UsesWidgetWithParamsOnceRemoved1'));
+
+        $usesWidgetWithParamsOnceRemoved1 = $provider->make('UsesWidgetWithParamsOnceRemoved1');
+        $usesWidgetWithParams1 = $provider->make('UsesWidgetWithParams1');
+
+        $this->assertEquals($genericName, $usesWidgetWithParams1->widget->name);
+        $this->assertEquals($specificName, $usesWidgetWithParamsOnceRemoved1->usesWidget->widget->name);
+    }
+
+
+    public function testClassConstructorChainSharing() {
+
+        $provider = new Auryn\Provider();
+
+        $warningLogger = new Logger('warn');
+        $infoLogger = new Logger('info');
+
+        $provider->share($warningLogger, array('RequiresLogger1'));
+        $provider->share($infoLogger, array('RequiresLogger2'));
+
+        $requiresLogger1 = $provider->make('RequiresLogger1');
+        $requiresLogger2 = $provider->make('RequiresLogger2');
+
+        $this->assertEquals('warn', $requiresLogger1->requiresLoggerDependency1->logger->getLogLevel());
+        $this->assertEquals('info', $requiresLogger2->requiresLoggerDependency2->logger->getLogLevel());
+    }
+
+
+    public function testClassConstructorChainSharing2() {
+
+        $provider = new Auryn\Provider();
+
+        $warningLogger = new Logger('warn');
+        $infoLogger = new Logger('info');
+
+        $provider->share($warningLogger); //Used by all classes
+        //$provider->share($infoLogger, array('RequiresLogger2')); //used by RequiresLogger2 and it's constructor dependencies. 
+
+        $requiresLogger1 = $provider->make('RequiresLogger1');
+        //$requiresLogger2 = $provider->make('RequiresLogger2');
+
+        $this->assertEquals('warn', $requiresLogger1->requiresLoggerDependency1->logger->getLogLevel());
+        //$this->assertEquals('info', $requiresLogger2->requiresLoggerDependency2->logger->getLogLevel());
+    }
+    
+
+    public function testClassConstructorChainSharing3() {
+
+        $provider = new Auryn\Provider();
+
+        $warningLogger = new Logger('warn');
+        $infoLogger = new Logger('info');
+
+        $provider->share($warningLogger); //Used by all classes
+        $provider->share($infoLogger, array('RequiresLogger2')); //used by RequiresLogger2 and it's constructor dependencies. 
+
+        $requiresLogger1 = $provider->make('RequiresLogger1');
+        $requiresLogger2 = $provider->make('RequiresLogger2');
+
+        $this->assertEquals('warn', $requiresLogger1->requiresLoggerDependency1->logger->getLogLevel());
+        $this->assertEquals('info', $requiresLogger2->requiresLoggerDependency2->logger->getLogLevel());
+    }
+    
+    //TODO - add another test regarding creating multiple shared objects.
+    //TODO - add alias + hierarchical sharing test
+
+//    public function testSharingAliasedClass() {
+//
+//        $this->markTestIncomplete(
+//            'This test is not run, as the correct behaviour is not defined.'
+//        );
+//        return;
+//        
+//        $provider = new Auryn\Provider();
+//        $testClass = new TestSharingClass();
+//        $provider->alias('TestSharingClass', 'AliasedTestSharingClass');
+//        $provider->share($testClass);
+//        $instance = $provider->make('TestSharingClass');
+//        $this->assertInstanceOf('AliasedTestSharingClass', $instance);
+//    }
+
     /**
      * @dataProvider provideInaccessibleExecutables
      */
