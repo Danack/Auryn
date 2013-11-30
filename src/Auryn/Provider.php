@@ -677,12 +677,6 @@ class Provider implements Injector {
         return $reflectionInstance->isInstantiable();
     }
 
-    private function isImplemented($nonConcreteType) {
-        $lowNonConcrete = strtolower($nonConcreteType);
-        
-        return isset($this->aliases[$lowNonConcrete]);
-    }
-
     private function buildArgumentFromTypeHint(\ReflectionFunctionAbstract $function, \ReflectionParameter $param) {
         $typeHint = $this->reflectionStorage->getParamTypeHint($function, $param);
         $typeHintLower = strtolower($typeHint);
