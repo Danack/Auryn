@@ -11,16 +11,15 @@ class InjectionInfoCollection {
      */
     protected $injectionInfoArray = array();
 
+    function __construct(array $injectionDefinition, array $chainClassConstructors) {
+        $this->addInjectionDefinition($injectionDefinition, $chainClassConstructors);
+    }
 
     function addInjectionDefinition(array $injectionDefinition, array $chainClassConstructors) {
         $this->injectionInfoArray[] = new InjectionInfo($injectionDefinition, $chainClassConstructors);
     }
 
     function getInjectionDefinition(array $chainClassConstructors) {
-        if (count($this->injectionInfoArray) == 0) {
-            return null;//$this->injectionInfoArray[0];
-        }
-
         $bestInjectionInfo = null;
 
         $bestMatch = -1;

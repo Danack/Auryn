@@ -251,10 +251,12 @@ class Provider implements Injector {
         $this->validateInjectionDefinition($injectionDefinition);
         $lowClass = strtolower($className);
         if (array_key_exists($lowClass, $this->injectionDefinitions) == false) {
-            $this->injectionDefinitions[$lowClass] = new InjectionInfoCollection();
+            $this->injectionDefinitions[$lowClass] = new InjectionInfoCollection($injectionDefinition, $chainClassConstructors);
+        }
+        else{
+            $this->injectionDefinitions[$lowClass]->addInjectionDefinition($injectionDefinition, $chainClassConstructors);
         }
 
-        $this->injectionDefinitions[$lowClass]->addInjectionDefinition($injectionDefinition, $chainClassConstructors);
 
 
         return $this;
