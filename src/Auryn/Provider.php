@@ -383,15 +383,7 @@ class Provider implements Injector {
     }
 
 
-    function setSharedInstance($className, $instance, array $chainClassConstructors = array()) {
-        if (is_object($instance) == false) {
-            $parameterType = gettype($instance);
-            throw new BadArgumentException(
-                get_class($this).'::share() requires a object at ' .
-                'Argument 1; ' . $parameterType . ' specified'
-            );
-        }
-
+    protected function setSharedInstance($className, $instance, array $chainClassConstructors = array()) {
         $lowClass = strtolower($className);        
         if (isset($this->aliases[$lowClass])) {
             $lowClass = strtolower($this->aliases[$lowClass]);
