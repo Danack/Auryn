@@ -683,22 +683,6 @@ class Provider implements Injector {
         return isset($this->aliases[$lowNonConcrete]);
     }
 
-    private function buildImplementation($interfaceOrAbstractName) {
-        $lowClass  = strtolower($interfaceOrAbstractName);
-        $implClass = $this->aliases[$lowClass];
-        $implObj   = $this->makeInternal($implClass);
-        $implRefl  = $this->reflectionStorage->getClass($implClass);
-
-        if (!$implRefl->isSubclassOf($interfaceOrAbstractName)) {
-            throw new BadArgumentException(
-                sprintf(self::E_BAD_IMPLEMENTATION_MESSAGE, $implRefl->name, $interfaceOrAbstractName),
-                self::E_BAD_IMPLEMENTATION_CODE
-            );
-        }
-
-        return $implObj;
-    }
-
     private function buildArgumentFromTypeHint(\ReflectionFunctionAbstract $function, \ReflectionParameter $param) {
         $typeHint = $this->reflectionStorage->getParamTypeHint($function, $param);
         $typeHintLower = strtolower($typeHint);
