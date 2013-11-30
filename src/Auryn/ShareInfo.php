@@ -19,13 +19,6 @@ class ShareInfo {
         $this->classNameOrInstance = null;
     }
 
-    public function setInstance($classNameOrInstance) { 
-        if ($classNameOrInstance == null) {
-            return;
-        }
-        $this->classNameOrInstance = $classNameOrInstance;
-    }
-    
     public function getChainClassConstructors(array $classNameHierarchy) {
 
         $usedIndex = 0;
