@@ -28,6 +28,12 @@ class ShareInfoCollection {
         $this->sharedInfoArray[] = new ShareInfo($instance, $chainClassConstructors);
     }
 
+    /**
+     * Return the shared instance if it was shared for a $chainClassConstructors that
+     * matches the current chainClassConstructors
+     * @param array $chainClassConstructors
+     * @return mixed|null
+     */
     function getSharedDefinition(array $chainClassConstructors) {
         $bestSharedInfo = $this->getBestSharedInfo($chainClassConstructors);
         

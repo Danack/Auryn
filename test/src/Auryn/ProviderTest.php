@@ -650,6 +650,18 @@ class ProviderTest extends PHPUnit_Framework_TestCase {
         $usesWidgetWithParams1 = $provider->make('UsesWidgetWithParams2');
     }
 
+    public function testClassConstructorChainSharingNotFound() {
+        $provider = new Auryn\Provider();
+        $warningLogger = new Logger('warn');
+
+        $provider->define('Logger', array(':logLevel' => 'info'));
+        $provider->share($warningLogger, array('RequiresLogger1'));
+
+        //The logger shared above doesn't match the new chainClassConstructors, so a new
+        //instance will be made.
+        $provider->make('RequiresLogger2');
+    }
+
     public function testClassConstructorChainDefine2() {
         $provider = new Auryn\Provider();
 
