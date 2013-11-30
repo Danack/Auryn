@@ -136,9 +136,11 @@ class Provider implements Injector {
 
         if ($this->isShared($lowClass)) {
             if ($this->sharedClasses[$lowClass] == null) {
-                $this->sharedClasses[$lowClass] = new ShareInfoCollection($lowClass);
+                $this->sharedClasses[$lowClass] = new ShareInfoCollection($lowClass, $provisionedObject);
             }
-            $this->sharedClasses[$lowClass]->setSharedInstance($provisionedObject);
+            else{
+                $this->sharedClasses[$lowClass]->setSharedInstance($provisionedObject);
+            }
         }
 
         unset($this->beingProvisioned[$lowClass]);
@@ -395,10 +397,12 @@ class Provider implements Injector {
 
         if (array_key_exists($lowClass, $this->sharedClasses) == false ||
             $this->sharedClasses[$lowClass] === null) {
-            $this->sharedClasses[$lowClass] = new ShareInfoCollection($lowClass);
+            $this->sharedClasses[$lowClass] = new ShareInfoCollection($lowClass, $instance, $chainClassConstructors);
+        }
+        else{
+            $this->sharedClasses[$lowClass]->setSharedInstance($instance, $chainClassConstructors);
         }
 
-        $this->sharedClasses[$lowClass]->setSharedInstance($instance, $chainClassConstructors);
         return $this;
     }
 

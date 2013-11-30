@@ -13,8 +13,9 @@ class ShareInfoCollection {
 
     private $sharedClassName;
     
-    function __construct($sharedClassName) {
+    function __construct($sharedClassName, $instance, array $chainClassConstructors = array()) {
         $this->sharedClassName = $sharedClassName;
+        $this->setSharedInstance($instance, $chainClassConstructors);
     }
 
     function clearSharedInstance() {
@@ -42,12 +43,7 @@ class ShareInfoCollection {
      * @return ShareInfo|null
      * @throws BuilderException
      */
-    function getBestSharedInfo($chainClassConstructors) {
-
-        if (count($this->sharedInfoArray) == 0) {
-            return null;
-        }
-
+    private function getBestSharedInfo($chainClassConstructors) {
         $bestInjectionInfo = null;
 
         $bestMatch = -1;
@@ -58,21 +54,7 @@ class ShareInfoCollection {
                 $bestMatch = $score;
             }
         }
-        
-//        if ($bestInjectionInfo == null) {
-//            $debugString = "Could not find definition for class in hierarchy:";
-//
-//            foreach ($chainClassConstructors as $className) {
-//                $debugString .= "\t$className\n";
-//            }
-//
-//            throw new BuilderException($debugString);
-//        }
 
         return $bestInjectionInfo;
     }
 }
-
-
-
-?>
