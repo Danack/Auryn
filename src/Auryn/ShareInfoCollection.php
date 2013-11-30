@@ -45,7 +45,7 @@ class ShareInfoCollection {
     function getBestSharedInfo($chainClassConstructors) {
 
         if (count($this->sharedInfoArray) == 0) {
-            return null;//$this->sharedInfoArray[0];
+            return null;
         }
 
         $bestInjectionInfo = null;

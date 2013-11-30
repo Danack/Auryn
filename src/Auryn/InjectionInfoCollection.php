@@ -30,13 +30,10 @@ class InjectionInfoCollection {
         }
         
         if ($bestInjectionInfo == null) {
-            $debugString = "Could not find definition for class in hierarchy:";
-
-            foreach ($chainClassConstructors as $className) {
-                $debugString .= "\t$className\n";
-            }
-            
-            throw new BuilderException($debugString);
+            throw new InjectionException(
+                sprintf(Provider::E_DEFINITION_NOT_AVAILABLE_FOR_CLASS_CONSTRUCTOR_CHAIN_MESSAGE, implode( ' -> ', $chainClassConstructors)),
+                Provider::E_DEFINITION_NOT_AVAILABLE_FOR_CLASS_CONSTRUCTOR_CHAIN_CODE
+            );
         }
 
         return $bestInjectionInfo->getInjectionDefinition();

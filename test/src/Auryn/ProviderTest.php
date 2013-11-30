@@ -633,6 +633,23 @@ class ProviderTest extends PHPUnit_Framework_TestCase {
         $this->assertEquals($widget2Name, $usesWidgetWithParams2->widget->name);
     }
 
+
+    public function testUnableToFindDefine() {
+
+        $chainClassConstructors = array('UsesWidgetWithParams2', 'WidgetWithParams');
+
+        $this->setExpectedException(
+            'Auryn\\InjectionException',
+            sprintf(Provider::E_DEFINITION_NOT_AVAILABLE_FOR_CLASS_CONSTRUCTOR_CHAIN_MESSAGE, implode( ' -> ', $chainClassConstructors)),
+            Provider::E_DEFINITION_NOT_AVAILABLE_FOR_CLASS_CONSTRUCTOR_CHAIN_CODE
+        );
+
+        $provider = new Auryn\Provider();
+        $provider->define('WidgetWithParams', array(':name' => 'parent1'), array('UsesWidgetWithParams1'));
+
+        $usesWidgetWithParams1 = $provider->make('UsesWidgetWithParams2');
+    }
+
     public function testClassConstructorChainDefine2() {
         $provider = new Auryn\Provider();
 
@@ -718,7 +735,7 @@ class ProviderTest extends PHPUnit_Framework_TestCase {
         $this->assertEquals('warn', $requiresLogger1->requiresLoggerDependency1->logger->getLogLevel());
         $this->assertEquals('info', $requiresLogger2->requiresLoggerDependency2->logger->getLogLevel());
     }
-    
+
     //TODO - add another test regarding creating multiple shared objects.
     //TODO - add alias + hierarchical sharing test
 

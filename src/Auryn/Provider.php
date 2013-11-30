@@ -77,6 +77,9 @@ class Provider implements Injector {
     const E_NON_PUBLIC_CONSTRUCTOR = 16;
     const E_NON_PUBLIC_CONSTRUCTOR_MESSAGE = 'Cannot instantiate class %s; constructor method is protected/private';
 
+    const E_DEFINITION_NOT_AVAILABLE_FOR_CLASS_CONSTRUCTOR_CHAIN_CODE = 50;
+    const E_DEFINITION_NOT_AVAILABLE_FOR_CLASS_CONSTRUCTOR_CHAIN_MESSAGE = 'Could not find definition for class in class constructor chain %s: ';
+
     function __construct(ReflectionStorage $reflectionStorage = NULL) {
         $this->reflectionStorage = $reflectionStorage ?: new ReflectionPool;
     }
@@ -221,7 +224,6 @@ class Provider implements Injector {
 
         if ($this->isDefined($lowClass)) {
             return $this->injectionDefinitions[$lowClass]->getInjectionDefinition($this->classHierarchy);
-
         } else {
             return array();
         }
