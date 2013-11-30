@@ -17,10 +17,6 @@ class ShareInfoCollection {
         $this->sharedClassName = $sharedClassName;
     }
 
-//    function addSharedDefinition($classNameOrInstance, array $chainClassConstructors) {
-//        $this->sharedInfoArray[] = new ShareInfo($classNameOrInstance, $chainClassConstructors);
-//    }
-
     function clearSharedInstance() {
         foreach ($this->sharedInfoArray as $shareInfo) {
             $shareInfo->clearSharedInstance();
@@ -28,13 +24,6 @@ class ShareInfoCollection {
     }
 
     function setSharedInstance($instance, array $chainClassConstructors = array()) {
-//        $bestSharedInfo = $this->getBestSharedInfo($chainClassConstructors);
-//
-//        if ($bestSharedInfo != null) {
-//            $bestSharedInfo->setInstance($instance);
-//            return;
-//        }
-
         $this->sharedInfoArray[] = new ShareInfo($instance, $chainClassConstructors);
     }
 
@@ -76,14 +65,12 @@ class ShareInfoCollection {
 //            foreach ($chainClassConstructors as $className) {
 //                $debugString .= "\t$className\n";
 //            }
-//            
+//
 //            throw new BuilderException($debugString);
 //        }
 
         return $bestInjectionInfo;
     }
-    
-    
 }
 
 
