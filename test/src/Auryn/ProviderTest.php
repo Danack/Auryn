@@ -1009,4 +1009,25 @@ class ProviderTest extends PHPUnit_Framework_TestCase {
         $provider->share('DepImplementation');
         $provider->alias('DepInterface', 'DepImplementation');
     }
+
+    function testDefiningSubClass() {
+
+        $provider = new Provider();
+
+        $provider->alias(
+            'BackgroundTask',
+            'FetchImageTask',
+            array('FetchImageController')
+        );
+
+        $provider->define(
+            'TaskRunner',
+            array(':taskName' => 'fetchImage'),
+            array('FetchImageController')
+        );
+
+        $controller = $provider->make('FetchImageController');
+
+        $this->assertInstanceOf('FetchImageTask', $controller->taskRunner->task);
+    }
 }

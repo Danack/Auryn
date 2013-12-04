@@ -490,3 +490,22 @@ class HasNonPublicConstructorWithArgs {
 class ClassWithCtor {
     function __construct(){}
 }
+
+interface BackgroundTask{}
+
+class FetchImageTask implements BackgroundTask {}
+
+class TaskRunner {
+    function __construct(BackgroundTask $task, $taskName) {
+        $this->task = $task;
+    }
+}
+
+class FetchImageController {
+
+    public $taskRunner;
+
+    function __construct(TaskRunner $taskRunner) {
+        $this->taskRunner = $taskRunner;
+    }
+}

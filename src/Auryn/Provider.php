@@ -78,6 +78,7 @@ class Provider implements Injector {
     const E_NON_PUBLIC_CONSTRUCTOR_MESSAGE = 'Cannot instantiate class %s; constructor method is protected/private';
 
     const E_DEFINITION_NOT_AVAILABLE_FOR_CLASS_CONSTRUCTOR_CHAIN_CODE = 50;
+    //@TODO - this is missing the actual class name being constructed.
     const E_DEFINITION_NOT_AVAILABLE_FOR_CLASS_CONSTRUCTOR_CHAIN_MESSAGE = 'Could not find definition for class in class constructor chain %s: ';
 
     function __construct(ReflectionStorage $reflectionStorage = NULL) {
