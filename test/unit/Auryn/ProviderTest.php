@@ -750,6 +750,16 @@ class ProviderTest extends PHPUnit_Framework_TestCase {
         $this->assertEquals($obj, $obj2);
     }
 
+    public function testAliasAfterMakingSharedAliasFails() {
+        $provider = new Provider();
+        $provider->share('DepImplementation');
+        $obj = $provider->make('DepImplementation');
+        $provider->alias('DepInterface', 'DepImplementation');
+        //$obj = $provider->make('DepInterface');
+        $obj2 = $provider->make('DepInterface');
+        $this->assertInstanceOf('DepImplementation', $obj);
+        $this->assertEquals($obj, $obj2);
+    }
     /**
      * @expectedException \Auryn\InjectionException
      * @expectedExceptionCode \Auryn\Provider::E_SHARED_CANNOT_ALIAS

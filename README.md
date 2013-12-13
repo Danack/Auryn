@@ -1,18 +1,51 @@
-# Auryn
+# Auryn Injector
 
 Auryn is a flexible recursive dependency injector. Use Auryn to bootstrap and wire together
 S.O.L.I.D., object-oriented PHP applications.
+
+##### How It Works
+
+Among other things, Auryn recursively instantiates class dependencies based on the parameter
+type-hints specified in class constructor signatures. This requires the use of Reflection. You may
+have heard that "reflection is slow". Let's clear something up: *anything* can be "slow" if you're
+doing it wrong. Reflection is an order of magnitude faster than disk access and several orders of
+magnitude faster than retrieving information (for example) from a remote database. Additionally,
+each reflection offers the opportunity to cache the results if you're worried about speed. Auryn
+caches any reflections it generates to minimize the potential performance impact.
 
 > Auryn **is NOT** a Service Locator. DO NOT turn it into one by passing the injector into your
 > application classes. Service Locator is an anti-pattern; it hides class dependencies, makes code
 > more difficult to maintain and makes a liar of your API! You should *only* use an injector for
 > wiring together the disparate parts of your application during your app's bootstrap phase.
 
+## The Guide
+
+**Basic Usage**
+
+* [Basic Instantiation](#basic-instantiation)
+* [Injection Definitions](#injection-definitions)
+* [Type-Hint Aliasing](#typehint-aliasing)
+* [Non-Class Parameters](#non-class-parameters)
+* [Global Parameter Definitions](#global-parameter-definitions)
+
+**Advanced Usage**
+
+* [Instance Sharing](#instance-sharing)
+* [Instantiation Delegates](#instantiation-delegates)
+* [Injecting for Execution](#injecting-for-execution)
+* [Dependency Resolution](#dependency-resolution)
+
+**Example Use Cases**
+
+* [Avoiding Evil Singletons](#avoiding-evil-singletons)
+* [Application Bootstrapping](#app-bootstrapping)
+
+
 ## Requirements and Installation
 
-Auryn requires PHP 5.3 or higher.
+- Auryn requires PHP 5.3 or higher.
 
-### INSTALL
+#### Installation
 
 ###### Github
 
@@ -30,8 +63,8 @@ You may also use composer to include Auryn as a dependency in your projects. The
 
 ##### Manual Download
 
-Archived tagged release versions are also available for manual download on the Github project's
-[Tags page](https://github.com/rdlowrey/Auryn/tags)
+Archived tagged release versions are also available for manual download on the project
+[tags page](https://github.com/rdlowrey/Auryn/tags)
 
 
 ## Basic Usage
@@ -39,46 +72,34 @@ Archived tagged release versions are also available for manual download on the G
 To start using the injector, simply create a new instance of the `Auryn\Provider` ("the Provider")
 class:
 
-```
+```php
 <?php
 $injector = new Auryn\Provider;
 ```
 
-###### How It Works
+### Basic Instantiation
 
-The Provider recursively instantiates class dependencies based on the parameter type-hints specified
-in their constructor method signatures. This requires the use of Reflection, so the Provider asks
-for an `Auryn\ReflectionPool` dependency to cache these reflections and avoid repeatedly reflecting
-the same classes over and over. The reflection pool dependency is lazy-injected. This means that if
-you don't specify an instance in `Auryn\Provider::__construct()` then the object will be
-automatically instantiated.
+If a class doesn't specify any dependencies in its constructor signature there's little point in
+using the Provider to generate it. However, for the sake of completeness consider that you can do
+the following with equivalent results:
 
-> _**An aside on reflection ...**_
->
-> You may have heard that "reflection is slow". Let's clear something up: *anything* can be "too
-> slow" if you're doing it wrong. Reflection is an order of magnitude faster than disk access and
-> several orders of magnitude faster than retrieving information (for example) from a remote database.
-> Additionally, each reflection offers the opportunity to cache the results if you're worried about
-> speed. Auryn caches any reflections it generates to minimize the potential performance impact.
-
-### [Basic Instantiation](#basic-instantiation)
-
-If a class doesn't specify any dependencies in its constructor signature there's little point in using the Provider to generate it (unless the object is shared in the context of the Provider -- read about shared instances on the [Advanced Usage](#) page). However, for the sake of completeness consider that you can do the following with equivalent results:
-
-```
+```php
 <?php
 $injector = new Auryn\Provider;
 $obj1 = new SomeNamespace\MyClass;
-$obj2 = $injector->make('SomeNamespace\\MyClass');
+$obj2 = $injector->make('SomeNamespace\MyClass');
 
 var_dump($obj2 instanceof SomeNamespace\MyClass); // true
 ```
 
 ###### Concrete Type-hinted Dependencies
 
-If a class only asks for concrete dependencies you can use the Provider to inject them without specifying any injection definitions. For example, in the following scenario you can use the Provider to automatically provision `MyClass` with the required `SomeDependency` and `AnotherDependency class instances:
+If a class only asks for concrete dependencies you can use the Provider to inject them without
+specifying any injection definitions. For example, in the following scenario you can use the
+Provider to automatically provision `MyClass` with the required `SomeDependency` and `AnotherDependency`
+class instances:
 
-```
+```php
 <?php
 class SomeDependency {}
 
@@ -102,9 +123,14 @@ var_dump($myObj->dep2 instanceof AnotherDependency); // true
 
 ###### Recursive Dependency Instantiation
 
-One of the Provider's key attributes is that it recursively traverses class dependency trees to instantiate objects. This is just a fancy way of saying, "if you instantiate object A which asks for object B, the Provider will instantiate any of object B's dependencies so that B can be instantiated and provided to A". This is perhaps best understood with a simple example. Consider the following classes in which a `Car` asks for `Engine` and the `Engine` class has concrete dependencies of its own:
+One of the Provider's key attributes is that it recursively traverses class dependency trees to
+instantiate objects. This is just a fancy way of saying, "if you instantiate object A which asks for
+object B, the Provider will instantiate any of object B's dependencies so that B can be instantiated
+and provided to A". This is perhaps best understood with a simple example. Consider the following
+classes in which a `Car` asks for `Engine` and the `Engine` class has concrete dependencies of its
+own:
 
-```
+```php
 <?php
 class Car {
     private $engine;
@@ -127,15 +153,20 @@ $car = $injector->make('Car');
 var_dump($car instanceof Car); // true
 ```
 
-### [Assigning Injection Definitions](#assigning-injection-definitions)
+### Injection Definitions
 
-You may have noticed that the previous examples all demonstrated instantiation of classes with explicit, type-hinted, concrete constructor parameters. Obviously, many of your classes won't fit this mold. Some classes will type-hint interfaces and abstract classes. Some will specify scalar parameters which offer no possibility of type-hinting in PHP. Still other parameters will be arrays, etc. In such cases we need to assist the Provider by telling it exactly what we want to inject.
+You may have noticed that the previous examples all demonstrated instantiation of classes with
+explicit, type-hinted, concrete constructor parameters. Obviously, many of your classes won't fit
+this mold. Some classes will type-hint interfaces and abstract classes. Some will specify scalar
+parameters which offer no possibility of type-hinting in PHP. Still other parameters will be arrays,
+etc. In such cases we need to assist the Provider by telling it exactly what we want to inject.
 
 ###### Defining Class Names for Constructor Parameters
 
-Let's look at how to provision a class with non-concrete type-hints in its constructor signature. Consider the following code in which a `Car` needs an `Engine` and `Engine` is an interface:
+Let's look at how to provision a class with non-concrete type-hints in its constructor signature.
+Consider the following code in which a `Car` needs an `Engine` and `Engine` is an interface:
 
-```
+```php
 <?php
 interface Engine {}
 
@@ -149,9 +180,10 @@ class Car {
 }
 ```
 
-To instantiate a `Car` in this case, we simply need to define an injection definition for the class ahead of time:
+To instantiate a `Car` in this case, we simply need to define an injection definition for the class
+ahead of time:
 
-```
+```php
 <?php
 $injector = new Auryn\Provider;
 $injector->define('Car', array('engine' => 'V8'));
@@ -163,13 +195,17 @@ var_dump($car instanceof Car); // true
 The most important points to notice here are:
 
 1. A custom definition is an `array` whose keys match constructor parameter names
-2. The values in the definition array represent the class names to inject for the specified parameter key
+2. The values in the definition array represent the class names to inject for the specified
+   parameter key
 
-Because the `Car` constructor parameter we needed to define was named `$engine`, our definition specified an `engine` key whose value was the name of the class (`V8`) that we want to inject.
+Because the `Car` constructor parameter we needed to define was named `$engine`, our definition
+specified an `engine` key whose value was the name of the class (`V8`) that we want to inject.
 
-Custom injection definitions are only necessary on a per-parameter basis. For example, in the following class we only need to define the injectable class for `$arg2` because `$arg1` specifies a concrete class type-hint:
+Custom injection definitions are only necessary on a per-parameter basis. For example, in the
+following class we only need to define the injectable class for `$arg2` because `$arg1` specifies a
+concrete class type-hint:
 
-```
+```php
 <?php
 class MyClass {
     private $arg1;
@@ -186,11 +222,13 @@ $injector->define('MyClass', array('arg2' => 'SomeImplementationClass'));
 $myObj = $injector->make('MyClass');
 ```
 
-> **NOTE:** Injecting instances where an abstract class is type-hinted works in exactly the same way as the above examples for interface type-hints.
+> **NOTE:** Injecting instances where an abstract class is type-hinted works in exactly the same way
+as the above examples for interface type-hints.
 
 ###### Using Existing Instances in Injection Definitions
 
-Injection definitions may also specify a pre-existing instance of the requisite class instead of the string class name:
+Injection definitions may also specify a pre-existing instance of the requisite class instead of the
+string class name:
 
 ```php
 <?php
@@ -237,15 +275,21 @@ $myObj = $injector->make('MyClass', array('dependency' => 'SomeImplementation'))
 var_dump($myObj instanceof MyClass); // true
 ```
 
-The above code shows how even though we haven't called  the Provider's `define` method, the call time specification allows us to instantiate `MyClass`.
+The above code shows how even though we haven't called  the Provider's `define` method, the
+call-time specification allows us to instantiate `MyClass`.
 
-> **NOTE:** on-the-fly instantiation definitions will override a pre-defined definition for the specified class, but only in the context of that particular call to `Auryn\Provider::make`.
+> **NOTE:** on-the-fly instantiation definitions will override a pre-defined definition for the
+specified class, but only in the context of that particular call to `Auryn\Provider::make`.
 
-### [Implementing Interfaces and Abstract Classes](#implementing-interfaces-and-abstract-classes)
+### Type-Hint Aliasing
 
-Programming to interfaces is one of the most useful concepts in object-oriented design (OOD), and well-designed code should type-hint interfaces whenever possible. But does this mean we have to assign injection definitions for every class in our application to reap the benefits of abstracted dependencies? Thankfully the answer to this question is, "NO."  The Provider accommodates this goal by accepting "aliases". Consider:
+Programming to interfaces is one of the most useful concepts in object-oriented design (OOD), and
+well-designed code should type-hint interfaces whenever possible. But does this mean we have to
+assign injection definitions for every class in our application to reap the benefits of abstracted
+dependencies? Thankfully the answer to this question is, "NO."  The Provider accommodates this goal
+by accepting "aliases". Consider:
 
-```
+```php
 <?php
 interface Engine {}
 class V8 implements Engine {}
@@ -266,19 +310,28 @@ $car = $injector->make('Car');
 var_dump($car instanceof Car); // bool(true)
 ```
 
-In this example we've demonstrated how to specify an alias class for any occurrence of a particular interface or abstract class type-hint. Once an implementation is assigned, the Provider will use it to provision any parameter with a matching type-hint.
+In this example we've demonstrated how to specify an alias class for any occurrence of a particular
+interface or abstract class type-hint. Once an implementation is assigned, the Provider will use it
+to provision any parameter with a matching type-hint.
 
-> **IMPORTANT:** If an injection definition is defined for a parameter covered by an implementation assignment, the definition takes precedence over the implementation.
+> **IMPORTANT:** If an injection definition is defined for a parameter covered by an implementation
+assignment, the definition takes precedence over the implementation.
 
-### [Non-Class Injection Parameters](#non-class-injection-parameters)
+### Non-Class Parameters
 
-All of the previous examples have demonstrated how the Provider class instantiates parameters based on type-hints, class name definitions and existing instances. But what happens if we want to inject a scalar or other non-object variable into a class? First, let's establish the following behavioral rule:
+All of the previous examples have demonstrated how the Provider class instantiates parameters based
+on type-hints, class name definitions and existing instances. But what happens if we want to inject
+a scalar or other non-object variable into a class? First, let's establish the following behavioral
+rule:
 
 > **IMPORTANT:** The Provider assumes all injection definitions are class names by default.
 
-If you want the Provider to treat a parameter definition as a "raw" value and not a class name, you must prefix the parameter name in your definition with a colon character `:`. For example, consider the following code in which we tell the Provider to share a `PDO` database connection instance and define its scalar constructor parameters:
+If you want the Provider to treat a parameter definition as a "raw" value and not a class name, you
+must prefix the parameter name in your definition with a colon character `:`. For example, consider
+the following code in which we tell the Provider to share a `PDO` database connection instance and
+define its scalar constructor parameters:
 
-```
+```php
 <?php
 $injector = new Auryn\Provider;
 $injector->share('PDO');
@@ -291,9 +344,14 @@ $injector->define('PDO', array(
 $db = $injector->make('PDO');
 ```
 
-The colon character preceding the parameter names tells the Provider that the associated values ARE NOT class names. If the colons had been omitted above, Auryn would attempt to instantiate classes of the names specified in the string and an exception would result. Also, note that we could just as easily specified arrays or integers or any other data type in the above definitions. As long as the parameter name is prefixed with a `:`, Auryn will inject the value directly without attempting to instantiate it.
+The colon character preceding the parameter names tells the Provider that the associated values ARE
+NOT class names. If the colons had been omitted above, Auryn would attempt to instantiate classes of
+the names specified in the string and an exception would result. Also, note that we could just as
+easily specified arrays or integers or any other data type in the above definitions. As long as the
+parameter name is prefixed with a `:`, Auryn will inject the value directly without attempting to
+instantiate it.
 
-### [Global Parameter Definitions](#global-parameter-definitions)
+### Global Parameter Definitions
 
 @TODO
 
@@ -302,9 +360,17 @@ The colon character preceding the parameter names tells the Provider that the as
 
 ### Instance Sharing
 
-One of the more ubiquitous plagues in modern OOP is the Singleton anti-pattern. Coders looking to limit classes to a single instance often fall into the trap of using `static` Singleton implementations for things like configuration classes and database connections. While it's often necessary to prevent multiple instances of a class, the Singleton method spells death to testability and should generally be avoided. `Auryn\Provider` makes sharing class instances across contexts a triviality while allowing maximum testability and API transparency.
+One of the more ubiquitous plagues in modern OOP is the Singleton anti-pattern. Coders looking to
+limit classes to a single instance often fall into the trap of using `static` Singleton
+implementations for things like configuration classes and database connections. While it's often
+necessary to prevent multiple instances of a class, the Singleton method spells death to testability
+and should generally be avoided. `Auryn\Provider` makes sharing class instances across contexts a
+triviality while allowing maximum testability and API transparency.
 
-Let's consider how a typical problem facing object-oriented web applications is easily solved by wiring together your application using Auryn. Here, we want to inject a single database connection instance across multiple layers of an application. We have a controller class that asks for a DataMapper that requires a `PDO` database connection instance:
+Let's consider how a typical problem facing object-oriented web applications is easily solved by
+wiring together your application using Auryn. Here, we want to inject a single database connection
+instance across multiple layers of an application. We have a controller class that asks for a
+DataMapper that requires a `PDO` database connection instance:
 
 ```php
 <?php
@@ -330,15 +396,18 @@ $injector->share($db);
 $myController = $injector->make('MyController');
 ```
 
-In the above code, the `DataMapper` instance will be provisioned with the same `PDO` database connection instance we originally shared. This is example is contrived and overly simple, but the implication should be clear:
+In the above code, the `DataMapper` instance will be provisioned with the same `PDO` database
+connection instance we originally shared. This is example is contrived and overly simple, but the
+implication should be clear:
 
-> By sharing an instance of a class, `Auryn\Provider` will always use that instance when provisioning classes that type-hint the shared class.
+> By sharing an instance of a class, `Auryn\Provider` will always use that instance when
+> provisioning classes that type-hint the shared class.
 
 ###### A Simpler Example
 
 Let's look at a simple proof of concept:
 
-```
+```php
 <?php
 class Person {
     public $name = 'John Snow';
@@ -357,11 +426,18 @@ var_dump($anotherPerson->name); // Arya Stark
 var_dump($person === $anotherPerson); // bool(true) because it's the same instance!
 ```
 
-Defining an object as shared will store the provisioned instance in the Provider's shared cache and all future requests to the provider for an injected instance of that class will return the originally created object (unless you manually clear it from the cache). Note that in the above code we shared the class name (`Person`) instead of an actual instance. Sharing works with either a class name or an instance of a class. The difference is that when you specify a class name the Provider will cache the shared instance the first time it is asked to create it.
+Defining an object as shared will store the provisioned instance in the Provider's shared cache and
+all future requests to the provider for an injected instance of that class will return the
+originally created object (unless you manually clear it from the cache). Note that in the above code
+we shared the class name (`Person`) instead of an actual instance. Sharing works with either a class
+name or an instance of a class. The difference is that when you specify a class name the Provider
+will cache the shared instance the first time it is asked to create it.
 
-> **NOTE:** Once the Provider caches a shared instance, call-time definitions passed to `Auryn\Provider::make` will have no effect. Once shared, an instance will always be returned for instantiations of its type until the object is un-shared or refreshed:
+> **NOTE:** Once the Provider caches a shared instance, call-time definitions passed to
+`Auryn\Provider::make` will have no effect. Once shared, an instance will always be returned for
+instantiations of its type until the object is un-shared or refreshed:
 
-```
+```php
 <?php
 // Clears shared instance from the Provider cache and unshares future StdClass instantiations
 $injector->unshare('StdClass');
@@ -373,11 +449,14 @@ $injector->refresh('StdClass');
 ```
 
 
-### Delegates
+### Instantiation Delegates
 
-Often factory classes/methods are used to prepare an object for use after instantiation. Auryn allows you to integrate factories and builders directly into the injection process by specifying callable instantiation delegates on a per-class basis. Let's look at a very basic example to demonstrate the concept of injection delegates:
+Often factory classes/methods are used to prepare an object for use after instantiation. Auryn
+allows you to integrate factories and builders directly into the injection process by specifying
+callable instantiation delegates on a per-class basis. Let's look at a very basic example to
+demonstrate the concept of injection delegates:
 
-```
+```php
 <?php
 class MyComplexClass {
     public $verification = false;
@@ -400,11 +479,17 @@ $obj = $injector->make('MyComplexClass');
 var_dump($obj->verification); // bool(true)
 ```
 
-In the above code we delegate instantiation of the `MyComplexClass` class to a closure, `$complexClassFactory`. Once this delegation is made, the Provider will return the results of the specified closure when asked to instantiate `MyComplexClass`.
+In the above code we delegate instantiation of the `MyComplexClass` class to a closure,
+`$complexClassFactory`. Once this delegation is made, the Provider will return the results of the
+specified closure when asked to instantiate `MyComplexClass`.
 
 ###### Available Delegate Types
 
-Any valid PHP callable may be registered as a class instantiation delegate using `Auryn\Provider::delegate`. Additionally you may specify the name of a delegate class that specifies an `__invoke` method and it will be automatically provisioned and have its `__invoke` method called at delegation time. Instance methods from uninstantiated classes may also be specified using the `['NonStaticClassName', 'factoryMethod']` construction. For example:
+Any valid PHP callable may be registered as a class instantiation delegate using
+`Auryn\Provider::delegate`. Additionally you may specify the name of a delegate class that
+specifies an `__invoke` method and it will be automatically provisioned and have its `__invoke`
+method called at delegation time. Instance methods from uninstantiated classes may also be specified
+using the `['NonStaticClassName', 'factoryMethod']` construction. For example:
 
 ```php
 <?php
@@ -441,7 +526,7 @@ $obj = $injector->make('SomeClassWithDelegatedInstantiation');
 var_dump($obj->value); // int(2)
 ```
 
-### Function/Method Provisioning
+### Injecting for Execution
 
 In addition to provisioning class instances using constructors, Auryn can also recursively instantiate
 the parameters of any [valid PHP callable](http://php.net/manual/en/language.types.callable.php).
@@ -492,11 +577,11 @@ var_dump($injector->execute('Example::myMethod', $args = [':arg' => 42]));
 5. If a dependency is type-hinted, the Provider will recursively instantiate it subject to any implementations or definitions
 6. If no type-hint exists and the parameter has a default value, the default value is injected
 7. If a global parameter value is defined that value is used
-8. Throw an exception because you're a moron
+8. Throw an exception because you did something stupid
 
 ## Example Use Cases
 
-Dependency Injection Container (DIC) are generally misunderstood in the PHP community. One of the 
+Dependency Injection Containers (DIC) are generally misunderstood in the PHP community. One of the 
 primary culprits is the misuse of such containers in the mainstream application frameworks. Often,
 these frameworks warp their DICs into Service Locator anti-patterns. This is a shame because a
 good DIC should be the exact opposite of a Service Locator.
@@ -523,9 +608,12 @@ OOP style and at worst a maintainability nightmare. The takeaway here is this:
 > **IMPORTANT:** do not use Auryn like a Service Locator!
 
 
-## Use Auryn to Avoid Evil Singletons
+### Avoiding Evil Singletons
 
-A common difficulty in web applications is limiting the number of database connection instances. It's wasteful and slow to open up new connections each time we need to talk to a database. Unfortunately, using singletons to limit these instances makes code brittle and hard to test. Let's see how we can use Auryn to inject the same `PDO` instance across the entire scope of our application.
+A common difficulty in web applications is limiting the number of database connection instances.
+It's wasteful and slow to open up new connections each time we need to talk to a database.
+Unfortunately, using singletons to limit these instances makes code brittle and hard to test. Let's
+see how we can use Auryn to inject the same `PDO` instance across the entire scope of our application.
 
 Say we have a service class that requires two separate data mappers to persist information to a database:
 
@@ -580,7 +668,8 @@ class SomeService {
 }
 ```
 
-In our wiring/bootstrap code, we simply instantiate the `PDO` instance once and share it in the context of the `Provider`:
+In our wiring/bootstrap code, we simply instantiate the `PDO` instance once and share it in the
+context of the `Provider`:
 
 ```php
 <?php
@@ -594,9 +683,11 @@ $injector->share($pdo);
 $mapper = $injector->make('SomeService');
 ```
 
-In the above code, the DIC instantiates our service class. More importantly, the data mapper classes it generates to do so are injected *with the same database connection instance we originally shared*.
+In the above code, the DIC instantiates our service class. More importantly, the data mapper classes
+it generates to do so are injected *with the same database connection instance we originally shared*.
 
-Of course, we don't have to manually instantiate our `PDO` instance. We could just as easily seed the container with a definition for how to create the `PDO` object and let it handle things for us:
+Of course, we don't have to manually instantiate our `PDO` instance. We could just as easily seed
+the container with a definition for how to create the `PDO` object and let it handle things for us:
 
 ```php
 <?php
@@ -607,15 +698,19 @@ $injector->share('PDO');
 $service = $injector->make('SomeService');
 ```
 
-In the above code, the injector will pass the string definition as the `$dsn` argument in the `PDO::__construct` method and generate the shared PDO instance automatically only if one of the classes it instantiates requires a `PDO` instance!
+In the above code, the injector will pass the string definition as the `$dsn` argument in the
+`PDO::__construct` method and generate the shared PDO instance automatically only if one of the
+classes it instantiates requires a `PDO` instance!
 
 
 
-## Use Auryn for App Bootstrapping
+### App-Bootstrapping
 
 DICs should be used to wire together the disparate objects of your application into a cohesive
-functional unit (generally at the bootstrap or front-controller stage of the application). One such usage provides an elegant solution for one of the thorny problems in object-oriented (OO) web applications: how to
-instantiate classes in a routed environment where the dependencies are not known ahead of time.
+functional unit (generally at the bootstrap or front-controller stage of the application). One such
+usage provides an elegant solution for one of the thorny problems in object-oriented (OO) web
+applications: how to instantiate classes in a routed environment where the dependencies are not
+known ahead of time.
 
 Consider the following front controller code whose job is to:
 
@@ -624,7 +719,7 @@ Consider the following front controller code whose job is to:
 3. Route the request instance given the application's route list
 4. Instantiate the routed controller and invoke a method appropriate to the HTTP request
 
-```
+```php
 <?php
 
 define('CONTROLLER_ROUTES', '/hard/path/to/routes.xml');
@@ -669,7 +764,7 @@ try {
 And elsewhere we have various controller classes, each of which ask for their own individual
 dependencies:
 
-```
+```php
 <?php
 
 class WidgetController {
