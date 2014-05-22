@@ -332,8 +332,6 @@ class ClassConstructorChainProviderPlugin implements ProviderPlugin {
     {
         return [];
     }
-
-
 }
 
 

@@ -924,6 +924,10 @@ class ProviderTest extends PHPUnit_Framework_TestCase {
         $provider = new Provider();
         $object = $provider->make('DependencyHasDefault');
         $this->assertNotNull($object->dependencyClass);
-        $this->assertInstanceOf('DependencyClass', $object->dependencyClass);
+        $this->assertInstanceOf(
+            'DependencyClass',
+            $object->dependencyClass,
+            'Injector used default param instead of creating param.'
+        );
     }
 }
