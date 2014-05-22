@@ -7,237 +7,12 @@ namespace Auryn;
  * implementation and delegation rules for injecting and automatically provisioning deeply nested
  * class dependencies.
  */
-class Provider implements Injector {
+class Provider extends AurynInjector {
 
-    const RAW_INJECTION_PREFIX = ':';
-
-    const E_MAKE_FAILURE = 0;
-    const E_DELEGATION_FAILURE = 1;
-    const E_INVALID_CLASS = 2;
-    const E_CLASS_NOT_FOUND = 3;
-    const E_RAW_PREFIX = 4;
-    const E_NON_EMPTY_STRING_ALIAS = 5;
-    const E_SHARE_ARGUMENT = 6;
-    const E_DELEGATE_ARGUMENT = 7;
-    const E_CALLABLE = 8;
-    const E_BAD_IMPLEMENTATION = 9;
-    const E_BAD_PARAM_IMPLEMENTATION = 10;
-    const E_UNDEFINED_PARAM = 11;
-    const E_NEEDS_DEFINITION = 12;
-    const E_CYCLIC_DEPENDENCY = 13;
-    const E_ALIASED_CANNOT_SHARE = 14;
-    const E_SHARED_CANNOT_ALIAS = 15;
-    const E_NON_PUBLIC_CONSTRUCTOR = 16;
-    const E_NOT_EXECUTABLE = 17;
-
-    private $reflectionStorage;
-    private $aliases = array();
-    private $prepares = array();
-    private $sharedClasses = array();
-    private $delegatedClasses = array();
-    private $beingProvisioned = array();
-    private $paramDefinitions = array();
-    private $injectionDefinitions = array();
-    private $errorMessages = array(
-        self::E_MAKE_FAILURE => "Could not make %s: %s",
-        self::E_DELEGATION_FAILURE => 'Delegation failed while attempting to provision %s',
-        self::E_INVALID_CLASS => 'Delegate callable must return an instance of %s; %s returned',
-        self::E_CLASS_NOT_FOUND => 'Provider instantiation failure: %s doesn\'t exist and could not be found by any registered autoloaders',
-        self::E_RAW_PREFIX => 'Invalid injection definition for parameter %s; raw parameter names must be prefixed with `:` (:$s) to differentiate them from provisionable type-hints.',
-        self::E_NON_EMPTY_STRING_ALIAS => 'Invalid alias: non-empty string required at both Argument 1 and Argument 2',
-        self::E_SHARE_ARGUMENT => '%s::share() requires a string class name or object instance at Argument 1; %s specified',
-        self::E_DELEGATE_ARGUMENT => '%s::delegate expects a valid callable or provisionable executable class or method reference at Argument 2',
-        self::E_CALLABLE => 'Invalid executable: callable, invokable class name or array in the form [className, methodName] required',
-        self::E_BAD_IMPLEMENTATION => 'Bad implementation: %s does not implement %s',
-        self::E_BAD_PARAM_IMPLEMENTATION => 'Bad implementation definition encountered while attempting to provision non-concrete parameter %s of type %s',
-        self::E_UNDEFINED_PARAM => 'No definition available while attempting to provision typeless non-concrete parameter %s(%s)',
-        self::E_NEEDS_DEFINITION => 'Injection definition/implementation required for non-concrete parameter $%s of type %s',
-        self::E_CYCLIC_DEPENDENCY => "Detected a cyclic dependency while provisioning %s",
-        self::E_ALIASED_CANNOT_SHARE => 'Cannot share class %s, it has already been aliased to %s',
-        self::E_SHARED_CANNOT_ALIAS => 'Cannot alias class %s to %s, it has already been shared.',
-        self::E_NON_PUBLIC_CONSTRUCTOR => 'Cannot instantiate class %s; constructor method is protected/private'
-    );
 
     public function __construct(ReflectionStorage $reflectionStorage = NULL) {
-        $this->reflectionStorage = $reflectionStorage ?: new ReflectionPool;
-    }
-
-    /**
-     * Instantiate a class according to a predefined or custom call-time injection definition
-     *
-     * @param string $className The class to provision
-     * @param array  $customDefinition An optional array of one-time instantiation parameters
-     * @throws \Auryn\InjectionException
-     * @return mixed A provisioned instance of the $className class
-     */
-    public function make($className, array $customDefinition = array()) {
-        $lowClass = ltrim(strtolower($className),'\\');
-
-        if (isset($this->aliases[$lowClass])) {
-            $className = $this->aliases[$lowClass];
-            $lowClass = strtolower($className);
-        }
-
-        $this->doCyclicDependencyCheck($className, $lowClass);
-
-        // isset() is used specifically here instead of $this->isShared() because classes may be
-        // marked as "shared" before an instance is stored. In these cases the class is "shared,"
-        // but it has a NULL value and instantiation is needed.
-        if (isset($this->sharedClasses[$lowClass])) {
-            $provisionedObject = $this->sharedClasses[$lowClass];
-        } elseif (isset($this->delegatedClasses[$lowClass])) {
-            $provisionedObject = $this->provisionFromDelegate($className);
-        } else {
-            $provisionedObject = $this->provisionInstance($className, $customDefinition);
-        }
-
-        if ($this->isShared($lowClass)) {
-            $this->sharedClasses[$lowClass] = $provisionedObject;
-        }
-
-        if ($this->prepares) {
-            $this->prepareInstance($provisionedObject, $lowClass);
-        }
-
-        unset($this->beingProvisioned[$lowClass]);
-
-        return $provisionedObject;
-    }
-
-    private function doCyclicDependencyCheck($className, $lowClass) {
-        if (isset($this->beingProvisioned[$lowClass])) {
-            throw new CyclicDependencyException(
-                $className,
-                sprintf($this->errorMessages[self::E_CYCLIC_DEPENDENCY], $className),
-                self::E_CYCLIC_DEPENDENCY
-            );
-        }
-
-        $this->beingProvisioned[$lowClass] = TRUE;
-    }
-
-    private function provisionFromDelegate($className) {
-        $lowClass = strtolower($className);
-
-        list($delegate, $args) = $this->delegatedClasses[$lowClass];
-
-        $provisionedObject = $this->execute($delegate, $args);
-
-        if (!$provisionedObject instanceof $className) {
-            throw new InjectionException(
-                sprintf($this->errorMessages[self::E_INVALID_CLASS], $className, get_class($provisionedObject)),
-                self::E_INVALID_CLASS
-            );
-        }
-
-        return $provisionedObject;
-    }
-
-    private function provisionInstance($className, array $customDefinition) {
-        $lowClass = strtolower($className);
-        try {
-            $injectionDefinition = $this->selectClassDefinition($className, $customDefinition);
-
-            return $this->getInjectedInstance($className, $injectionDefinition);
-
-        } catch (CyclicDependencyException $e) {
-            unset($this->beingProvisioned[$lowClass]);
-            $cycleDetector = $e->getCycleDetector();
-
-            throw new CyclicDependencyException(
-                $cycleDetector,
-                sprintf($this->errorMessages[self::E_CYCLIC_DEPENDENCY], $className),
-                self::E_CYCLIC_DEPENDENCY,
-                $e
-            );
-        }
-    }
-
-    private function selectClassDefinition($className, $customDefinition) {
-        $definitions = $this->selectParentDefinition($className, $this->getDefinition($className));
-
-        return array_merge($definitions, $customDefinition);
-    }
-
-    private function selectParentDefinition($className, $childDefinition) {
-        try {
-            $classReflector = $this->reflectionStorage->getClass($className);
-            $parent = $classReflector->getParentClass();
-
-            return $parent
-                ? $this->selectParentDefinition($parent->getName(), $childDefinition)
-                : array_merge($this->getDefinition($className), $childDefinition);
-
-        } catch (\ReflectionException $e) {
-            throw new InjectionException(
-                sprintf($this->errorMessages[self::E_CLASS_NOT_FOUND], $className),
-                self::E_CLASS_NOT_FOUND,
-                $e
-            );
-        }
-    }
-
-    private function getDefinition($className) {
-        $lowClass = ltrim(strtolower($className),'\\');
-
-        return $this->isDefined($lowClass)
-            ? $this->injectionDefinitions[$lowClass]
-            : array();
-    }
-
-    private function isDefined($className) {
-        $lowClass = ltrim(strtolower($className),'\\');
-
-        return isset($this->injectionDefinitions[$lowClass]);
-    }
-
-    private function isShared($className) {
-        $lowClass = strtolower($className);
-
-        return array_key_exists($lowClass, $this->sharedClasses);
-    }
-
-    /**
-     * Defines a custom injection definition for the specified class
-     *
-     * @param string $className
-     * @param array $injectionDefinition An associative array matching constructor params to values
-     * @throws \Auryn\BadArgumentException On missing raw injection prefix
-     * @return \Auryn\Provider Returns the current instance
-     */
-    public function define($className, array $injectionDefinition) {
-        $this->validateInjectionDefinition($injectionDefinition);
-        $lowClass = ltrim(strtolower($className),'\\');
-        $this->injectionDefinitions[$lowClass] = $injectionDefinition;
-
-        return $this;
-    }
-
-    /**
-     * Assign a global default value for all parameters named $paramName
-     *
-     * Global parameter definitions are only used for parameters with no typehint, pre-defined or
-     * call-time definition.
-     *
-     * @param string $paramName The parameter name for which this value applies
-     * @param mixed $value The value to inject for this parameter name
-     * @return \Auryn\Provider Returns the current instance
-     */
-    public function defineParam($paramName, $value) {
-        $this->paramDefinitions[$paramName] = $value;
-
-        return $this;
-    }
-
-    private function validateInjectionDefinition(array $injectionDefinition) {
-        foreach ($injectionDefinition as $paramName => $value) {
-            if ($paramName[0] !== self::RAW_INJECTION_PREFIX && !is_string($value)) {
-                throw new BadArgumentException(
-                    sprintf($this->errorMessages[self::E_RAW_PREFIX], $paramName, $paramName),
-                    self::E_RAW_PREFIX
-                );
-            }
-        }
+        $defaultPlugin = new Plugin\StandardProviderPlugin();
+        parent::__construct($defaultPlugin, $reflectionStorage);
     }
 
     /**
@@ -252,33 +27,17 @@ class Provider implements Injector {
     public function alias($typehintToReplace, $alias) {
         if (empty($typehintToReplace) || !is_string($typehintToReplace)) {
             throw new BadArgumentException(
-                $this->errorMessages[self::E_NON_EMPTY_STRING_ALIAS],
-                self::E_NON_EMPTY_STRING_ALIAS
+                \Auryn\AurynInjector::$errorMessages[\Auryn\AurynInjector::E_NON_EMPTY_STRING_ALIAS],
+                \Auryn\AurynInjector::E_NON_EMPTY_STRING_ALIAS
             );
         } elseif (empty($alias) || !is_string($alias)) {
             throw new BadArgumentException(
-                $this->errorMessages[self::E_NON_EMPTY_STRING_ALIAS],
-                self::E_NON_EMPTY_STRING_ALIAS
+                \Auryn\AurynInjector::$errorMessages[\Auryn\AurynInjector::E_NON_EMPTY_STRING_ALIAS],
+                \Auryn\AurynInjector::E_NON_EMPTY_STRING_ALIAS
             );
         }
 
-        $lowTypehint = strtolower($typehintToReplace);
-        $lowAlias = strtolower($alias);
-
-        if (isset($this->sharedClasses[$lowTypehint])) {
-            $sharedClassName = strtolower(get_class($this->sharedClasses[$lowTypehint]));
-            throw new InjectionException(
-                sprintf($this->errorMessages[self::E_SHARED_CANNOT_ALIAS], $sharedClassName, $alias),
-                self::E_SHARED_CANNOT_ALIAS
-            );
-        } else {
-            $this->aliases[$lowTypehint] = $alias;
-        }
-
-        if (array_key_exists($lowTypehint, $this->sharedClasses)) {
-            $this->sharedClasses[$lowAlias] = $this->sharedClasses[$lowTypehint];
-            unset($this->sharedClasses[$lowTypehint]);
-        }
+        $this->plugin->alias($typehintToReplace, $alias);
 
         return $this;
     }
@@ -301,33 +60,45 @@ class Provider implements Injector {
      */
     public function share($classNameOrInstance) {
         if (is_string($classNameOrInstance)) {
-            $lowClass = ltrim(strtolower($classNameOrInstance),'\\');
-            $lowClass = isset($this->aliases[$lowClass])
-                ? strtolower($this->aliases[$lowClass])
-                : $lowClass;
-
-            $this->sharedClasses[$lowClass] = isset($this->sharedClasses[$lowClass])
-                ? $this->sharedClasses[$lowClass]
-                : NULL;
+            $this->plugin->shareClass($classNameOrInstance);
         } elseif (is_object($classNameOrInstance)) {
-            $lowClass = strtolower(get_class($classNameOrInstance));
-            if (isset($this->aliases[$lowClass])) {
-                // You cannot share an instance of a class that has already been aliased to another class.
-                throw new InjectionException(
-                    sprintf($this->errorMessages[self::E_ALIASED_CANNOT_SHARE], $lowClass, $this->aliases[$lowClass]),
-                    self::E_ALIASED_CANNOT_SHARE
-                );
-            }
-            $this->sharedClasses[$lowClass] = $classNameOrInstance;
+            $this->plugin->shareInstance($classNameOrInstance);
         } else {
             throw new BadArgumentException(
-                sprintf($this->errorMessages[self::E_SHARE_ARGUMENT], __CLASS__, gettype($classNameOrInstance)),
+                sprintf(\Auryn\AurynInjector::$errorMessages[self::E_SHARE_ARGUMENT], __CLASS__, gettype($classNameOrInstance)),
                 self::E_SHARE_ARGUMENT
             );
         }
-
         return $this;
     }
+
+    /**
+     * Defines a custom injection definition for the specified class
+     *
+     * @param string $className
+     * @param array $injectionDefinition An associative array matching constructor params to values
+     * @throws \Auryn\BadArgumentException On missing raw injection prefix
+     * @return \Auryn\Provider Returns the current instance
+     */
+    public function define($className, array $injectionDefinition){
+        $this->plugin->define($className, $injectionDefinition);
+    }
+    
+    /**
+     * Assign a global default value for all parameters named $paramName
+     *
+     * Global parameter definitions are only used for parameters with no typehint, pre-defined or
+     * call-time definition.
+     *
+     * @param string $paramName The parameter name for which this value applies
+     * @param mixed $value The value to inject for this parameter name
+     * @return \Auryn\Provider Returns the current instance
+     */
+    public function defineParam($paramName, $value) {
+        $this->plugin->defineParam($paramName, $value, array());
+    }
+
+
 
     /**
      * Unshares the specified class (or the class of the specified object)
@@ -336,12 +107,7 @@ class Provider implements Injector {
      * @return \Auryn\Provider Returns the current instance
      */
     public function unshare($classNameOrInstance) {
-        $className = is_object($classNameOrInstance)
-            ? get_class($classNameOrInstance)
-            : $classNameOrInstance;
-        $className = strtolower($className);
-
-        unset($this->sharedClasses[$className]);
+        $this->plugin->unshare($classNameOrInstance);
 
         return $this;
     }
@@ -353,13 +119,7 @@ class Provider implements Injector {
      * @return \Auryn\Provider Returns the current instance
      */
     public function refresh($classNameOrInstance) {
-        if (is_object($classNameOrInstance)) {
-            $classNameOrInstance = get_class($classNameOrInstance);
-        }
-        $className = strtolower($classNameOrInstance);
-        if (isset($this->sharedClasses[$className])) {
-            $this->sharedClasses[$className] = NULL;
-        }
+        $this->plugin->refresh($classNameOrInstance);
 
         return $this;
     }
@@ -374,35 +134,9 @@ class Provider implements Injector {
      * @return \Auryn\Provider Returns the current instance
      */
     public function delegate($className, $callable, array $args = array()) {
-        if ($this->canExecute($callable)) {
-            $delegate = array($callable, $args);
-        } else {
-            throw new BadArgumentException(
-                sprintf($this->errorMessages[self::E_DELEGATE_ARGUMENT], __CLASS__),
-                self::E_DELEGATE_ARGUMENT
-            );
-        }
-
-        $lowClass = ltrim(strtolower($className),'\\');
-        $this->delegatedClasses[$lowClass] = $delegate;
+        $this->plugin->delegate($className, $callable, $this->classConstructorChain, $args);
 
         return $this;
-    }
-
-    private function canExecute($exe) {
-        if (is_callable($exe)) {
-            return TRUE;
-        }
-
-        if (is_string($exe) && method_exists($exe, '__invoke')) {
-            return TRUE;
-        }
-
-        if (is_array($exe) && isset($exe[0], $exe[1]) && method_exists($exe[0], $exe[1])) {
-            return TRUE;
-        }
-
-        return FALSE;
     }
 
     /**
@@ -414,259 +148,8 @@ class Provider implements Injector {
      * @return \Auryn\Provider Returns the current instance
      */
     public function prepare($classInterfaceOrTraitName, $executable) {
-        if (!$this->canExecute($executable)) {
-            throw new BadArgumentException(
-                $this->errorMessages[self::E_CALLABLE],
-                self::E_CALLABLE
-            );
-        }
-
-        $normalizedName = ltrim(strtolower($classInterfaceOrTraitName),'\\');
-        $this->prepares[$normalizedName] = $executable;
+        $this->plugin->prepare($classInterfaceOrTraitName, $executable);
 
         return $this;
-    }
-
-    private function prepareInstance($obj, $lowClass) {
-        if (isset($this->prepares[$lowClass])) {
-            $preparer = $this->prepares[$lowClass];
-            $exe = $this->getExecutable($preparer);
-            $exe($obj, $this);
-        }
-
-        if ($interfacesImplemented = class_implements($obj)) {
-            $interfacesImplemented = array_flip(array_map('strtolower', $interfacesImplemented));
-            $interfacePrepares = array_intersect_key($this->prepares, $interfacesImplemented);
-            foreach ($interfacePrepares as $preparer) {
-                $exe = $this->getExecutable($preparer);
-                $exe($obj, $this);
-            }
-        }
-    }
-
-    /**
-     * Invoke the specified callable or class/method array, provisioning dependencies along the way
-     *
-     * @param mixed $callableOrMethodArr Valid PHP callable or an array of the form [class, method]
-     * @param array $invocationArgs Optional array specifying params to invoke the provisioned callable
-     * @param bool $makeAccessible If TRUE, protected/private methods will execute successfully
-     * @throws \Auryn\BadArgumentException
-     * @throws \Auryn\InjectionException
-     * @return mixed Returns the invocation result from the generated executable
-     */
-    public function execute($callableOrMethodArr, array $invocationArgs = array(), $makeAccessible = FALSE) {
-        $executable = $this->getExecutable($callableOrMethodArr, $makeAccessible);
-        $reflectionFunction = $executable->getCallableReflection();
-        $args = $this->generateInvocationArgs($reflectionFunction, $invocationArgs);
-
-        return call_user_func_array(array($executable, '__invoke'), $args);
-    }
-
-    /**
-     * Generate and provision an executable object from any PHP callable or class/method string array
-     *
-     * @param mixed $callableOrMethodArr Valid PHP callable or an array of the form [class, method]
-     * @param bool $makeAccessible If TRUE, protected/private methods will execute successfully
-     * @throws \Auryn\BadArgumentException
-     * @throws \Auryn\InjectionException
-     * @return \Auryn\Executable Returns an executable object
-     */
-    public function getExecutable($callableOrMethodArr, $makeAccessible = FALSE) {
-        $makeAccessible = (bool) $makeAccessible;
-        $executableArr = $this->generateExecutableReflection($callableOrMethodArr);
-        list($reflectionFunction, $invocationObject) = $executableArr;
-
-        if ($makeAccessible
-            && $reflectionFunction instanceof \ReflectionMethod
-            && !$reflectionFunction->isPublic()
-        ) {
-            $reflectionFunction->setAccessible(TRUE);
-        }
-
-        return new Executable($reflectionFunction, $invocationObject);
-    }
-
-    private function generateExecutableReflection($exeCallable) {
-        if (is_string($exeCallable)) {
-            $executableArr = $this->generateExecutableFromString($exeCallable);
-        } elseif ($exeCallable instanceof \Closure) {
-            $callableRefl = new \ReflectionFunction($exeCallable);
-            $executableArr = array($callableRefl, NULL);
-        } elseif (is_object($exeCallable) && is_callable($exeCallable)) {
-            $invocationObj = $exeCallable;
-            $callableRefl = $this->reflectionStorage->getMethod($invocationObj, '__invoke');
-            $executableArr = array($callableRefl, $invocationObj);
-        } elseif (is_array($exeCallable)
-            && isset($exeCallable[0], $exeCallable[1])
-            && count($exeCallable) === 2
-        ) {
-            $executableArr = $this->generateExecutableFromArray($exeCallable);
-        } else {
-            throw new BadArgumentException(
-                $this->errorMessages[self::E_CALLABLE],
-                self::E_CALLABLE
-            );
-        }
-
-        return $executableArr;
-    }
-
-    private function generateExecutableFromArray($arrayExecutable) {
-        list($classOrObj, $method) = $arrayExecutable;
-
-        if (is_object($classOrObj) && method_exists($classOrObj, $method)) {
-            $callableRefl = $this->reflectionStorage->getMethod($classOrObj, $method);
-            $executableArr = array($callableRefl, $classOrObj);
-        } elseif (is_string($classOrObj)) {
-            $executableArr = $this->generateStringClassMethodCallable($classOrObj, $method);
-        } else {
-            throw new BadArgumentException(
-                $this->errorMessages[self::E_CALLABLE],
-                self::E_CALLABLE
-            );
-        }
-
-        return $executableArr;
-    }
-
-    private function generateExecutableFromString($stringExecutable) {
-        if (function_exists($stringExecutable)) {
-            $callableRefl = $this->reflectionStorage->getFunction($stringExecutable);
-            $executableArr = array($callableRefl, NULL);
-        } elseif (method_exists($stringExecutable, '__invoke')) {
-            $invocationObj = $this->make($stringExecutable);
-            $callableRefl = $this->reflectionStorage->getMethod($invocationObj, '__invoke');
-            $executableArr = array($callableRefl, $invocationObj);
-        } elseif (strpos($stringExecutable, '::') !== FALSE) {
-            list($class, $method) = explode('::', $stringExecutable, 2);
-            $executableArr = $this->generateStringClassMethodCallable($class, $method);
-        } else {
-            throw new BadArgumentException(
-                $this->errorMessages[self::E_CALLABLE],
-                self::E_CALLABLE
-            );
-        }
-
-        return $executableArr;
-    }
-
-    private function generateStringClassMethodCallable($class, $method) {
-        $relativeStaticMethodStartPos = strpos($method, 'parent::');
-
-        if ($relativeStaticMethodStartPos === 0) {
-            $childReflection = $this->reflectionStorage->getClass($class);
-            $class = $childReflection->getParentClass()->name;
-            $method = substr($method, $relativeStaticMethodStartPos + 8);
-        }
-
-        $reflectionMethod = $this->reflectionStorage->getMethod($class, $method);
-
-        return $reflectionMethod->isStatic()
-            ? array($reflectionMethod, NULL)
-            : array($reflectionMethod, $this->make($class));
-    }
-
-    private function generateInvocationArgs(\ReflectionFunctionAbstract $function, array $definition) {
-        $invocationArgs = array();
-
-        // @TODO store this in ReflectionStorage
-        $reflectionParams = $function->getParameters();
-
-        foreach ($reflectionParams as $param) {
-            $rawParamKey = self::RAW_INJECTION_PREFIX . $param->name;
-
-            if (isset($definition[$param->name])) {
-                $argument = $this->make($definition[$param->name]);
-            } elseif (array_key_exists($rawParamKey, $definition)) {
-                $argument = $definition[$rawParamKey];
-            } elseif (!$argument = $this->buildArgumentFromTypeHint($function, $param)) {
-                $argument = $this->buildArgumentFromReflectionParameter($param);
-            }
-
-            $invocationArgs[] = $argument;
-        }
-
-        return $invocationArgs;
-    }
-
-    private function buildArgumentFromReflectionParameter(\ReflectionParameter $param) {
-        if (array_key_exists($param->name, $this->paramDefinitions)) {
-            $argument = $this->paramDefinitions[$param->name];
-        } elseif ($param->isDefaultValueAvailable()) {
-            $argument = $param->getDefaultValue();
-        } else {
-            $declaringClass = $param->getDeclaringClass()->getName();
-            throw new InjectionException(
-                sprintf($this->errorMessages[self::E_UNDEFINED_PARAM], $declaringClass,$param->name),
-                self::E_UNDEFINED_PARAM
-            );
-        }
-
-        return $argument;
-    }
-
-    protected function getInjectedInstance($className, array $definition) {
-        try {
-            $ctorMethod = $this->reflectionStorage->getConstructor($className);
-
-            if (!$ctorMethod) {
-                $object = $this->buildWithoutConstructorParams($className);
-            } elseif (!$ctorMethod->isPublic()) {
-                throw new InjectionException(
-                    sprintf($this->errorMessages[self::E_NON_PUBLIC_CONSTRUCTOR], $className),
-                    self::E_NON_PUBLIC_CONSTRUCTOR
-                );
-            } elseif ($ctorParams = $this->reflectionStorage->getConstructorParameters($className)) {
-                $args = $this->generateInvocationArgs($ctorMethod, $definition);
-                $reflectionClass = $this->reflectionStorage->getClass($className);
-                $object = $reflectionClass->newInstanceArgs($args);
-            } else {
-                $object = $this->buildWithoutConstructorParams($className);
-            }
-
-            return $object;
-
-        } catch (\ReflectionException $e) {
-            throw new InjectionException(
-                sprintf($this->errorMessages[self::E_MAKE_FAILURE], $className, $e->getMessage()),
-                self::E_MAKE_FAILURE,
-                $e
-            );
-        }
-    }
-
-    private function buildWithoutConstructorParams($className) {
-        if ($this->isInstantiable($className)) {
-            $object = new $className;
-        } else {
-            $reflectionClass = $this->reflectionStorage->getClass($className);
-            $type = $reflectionClass->isInterface() ? 'interface' : 'abstract';
-            throw new InjectionException(
-                sprintf($this->errorMessages[self::E_NEEDS_DEFINITION], $type, $className),
-                self::E_NEEDS_DEFINITION
-            );
-        }
-
-        return $object;
-    }
-
-    private function isInstantiable($className) {
-        $reflectionInstance = $this->reflectionStorage->getClass($className);
-
-        return $reflectionInstance->isInstantiable();
-    }
-
-    private function buildArgumentFromTypeHint(\ReflectionFunctionAbstract $function, \ReflectionParameter $param) {
-        $typeHint = $this->reflectionStorage->getParamTypeHint($function, $param);
-
-        if (!$typeHint) {
-            $object = NULL;
-        } elseif ($param->isDefaultValueAvailable()) {
-            $object = $param->getDefaultValue();
-        } else {
-            $object = $this->make($typeHint);
-        }
-
-        return $object;
     }
 }
