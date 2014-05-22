@@ -37,10 +37,6 @@ class StandardProviderPlugin implements ProviderPlugin {
     function getShared($className, array $classConstructorChain) {
         $lowClass = ltrim(strtolower($className), '\\');
 
-//        if (isset($this->sharedClasses[$lowClass]) == false) {
-//            return null;
-//        }
-
         if (array_key_exists($lowClass, $this->sharedClasses) == true) {
             if ($this->sharedClasses == null) {
                 return $lowClass;
@@ -70,11 +66,11 @@ class StandardProviderPlugin implements ProviderPlugin {
     /**
      * Shares the specified class across the Injector context
      *
-     * @param mixed $classNameOrInstance The class or object to share
+     * @param string $className The class or object to share
      */
-    function shareClass($classNameOrInstance) {
-        if (is_string($classNameOrInstance)) {
-            $lowClass = ltrim(strtolower($classNameOrInstance),'\\');
+    function shareClass($className, array $classConstructorChain = array()) {
+        
+            $lowClass = ltrim(strtolower($className),'\\');
             $lowClass = isset($this->aliases[$lowClass])
                 ? strtolower($this->aliases[$lowClass])
                 : $lowClass;
@@ -82,31 +78,13 @@ class StandardProviderPlugin implements ProviderPlugin {
             $this->sharedClasses[$lowClass] = isset($this->sharedClasses[$lowClass])
                 ? $this->sharedClasses[$lowClass]
                 : NULL;
-        } elseif (is_object($classNameOrInstance)) {
-            $lowClass = strtolower(get_class($classNameOrInstance));
-            if (isset($this->aliases[$lowClass])) {
-                // You cannot share an instance of a class that has already been aliased to another class.
-                throw new \Auryn\InjectionException(
-                    sprintf(\Auryn\AurynInjector::$errorMessages[\Auryn\AurynInjector::E_ALIASED_CANNOT_SHARE], $lowClass, $this->aliases[$lowClass]),
-                    \Auryn\AurynInjector::E_ALIASED_CANNOT_SHARE
-                );
-            }
-            $this->sharedClasses[$lowClass] = $classNameOrInstance;
-        } else {
-            throw new BadArgumentException(
-                sprintf(\Auryn\AurynInjector::$errorMessages[\Auryn\AurynInjector::E_SHARE_ARGUMENT], __CLASS__, gettype($classNameOrInstance)),
-                \Auryn\AurynInjector::E_SHARE_ARGUMENT
-            );
-        }
+
 
         return $this;
-        
-        
-
     }
 
-    function shareInstance($classNameOrInstance, array $classConstructorChain = array()) {
-        $lowClass = strtolower(get_class($classNameOrInstance));
+    function shareInstance($instance, array $classConstructorChain = array()) {
+        $lowClass = strtolower(get_class($instance));
 
         if (isset($this->aliases[$lowClass])) {
             // You cannot share an instance of a class that has already been aliased to another class.
@@ -120,7 +98,7 @@ class StandardProviderPlugin implements ProviderPlugin {
             );
         }
 
-        $this->sharedClasses[$lowClass] = $classNameOrInstance;
+        $this->sharedClasses[$lowClass] = $instance;
     }
 
     private function validateInjectionDefinition(array $injectionDefinition) {

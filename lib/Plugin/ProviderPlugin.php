@@ -54,14 +54,14 @@ interface ProviderPlugin {
      *
      * @param mixed $classNameOrInstance The class or object to share
      */
-    function shareClass($classNameOrInstance);
+    function shareClass($className, array $classConstructorChain = array());
     
     /**
      * @param $classNameOrInstance
      * @param array $classConstructorChain
      * @return mixed
      */
-    function shareInstance($classNameOrInstance, array $classConstructorChain = array());
+    function shareInstance($instance, array $classConstructorChain = array());
 
     /**
      * Unshares the specified class or the class of the specified instance
