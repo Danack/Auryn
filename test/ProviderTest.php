@@ -919,4 +919,11 @@ class ProviderTest extends PHPUnit_Framework_TestCase {
 
         $this->assertSame(42, $obj->testProp);
     }
+
+    public function testDependencyWithDefault() {
+        $provider = new Provider();
+        $object = $provider->make('DependencyHasDefault');
+        $this->assertNotNull($object->dependencyClass);
+        $this->assertInstanceOf('DependencyClass', $object->dependencyClass);
+    }
 }

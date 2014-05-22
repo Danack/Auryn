@@ -421,25 +421,13 @@ class AurynInjector implements Injector {
 
     private function buildArgumentFromTypeHint(\ReflectionFunctionAbstract $function, \ReflectionParameter $param) {
         $typeHint = $this->reflectionStorage->getParamTypeHint($function, $param);
-        $typeHintLower = strtolower($typeHint);
 
         if (!$typeHint) {
             $object = NULL;
-        } elseif ($object = $this->plugin->getShared($typeHint, $this->classConstructorChain)) {
-            //nothing to do.
-        } elseif ($this->isInstantiable($typeHintLower)
-            || $this->plugin->isDelegated($typeHintLower, $this->classConstructorChain)
-        ) {
-            $object = $this->makeInternal($typeHint);
-        } elseif ($alias = $this->plugin->getAlias($typeHintLower, $this->classConstructorChain)) {
-            $object = $this->makeInternal($alias);
         } elseif ($param->isDefaultValueAvailable()) {
             $object = $param->getDefaultValue();
         } else {
-            throw new InjectionException(
-                sprintf(\Auryn\AurynInjector::$errorMessages[self::E_NEEDS_DEFINITION], $param->getName(), $typeHint),
-                self::E_NEEDS_DEFINITION
-            );
+            $object = $this->makeInternal($typeHint);
         }
 
         return $object;

@@ -400,5 +400,14 @@ class SimpleNoTypehintClass {
     public function __construct($arg) {
         $this->testParam = $arg;
     }
-
 }
+
+class DependencyClass {}
+
+class DependencyHasDefault {
+    public $dependencyClass;
+    function __constrcut(DependencyClass $dependencyClass = null) {
+        $this->dependencyClass = $dependencyClass;
+    }
+}
+
