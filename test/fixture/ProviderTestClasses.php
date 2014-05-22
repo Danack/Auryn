@@ -406,7 +406,7 @@ class DependencyClass {}
 
 class DependencyHasDefault {
     public $dependencyClass;
-    function __constrcut(DependencyClass $dependencyClass = null) {
+    function __construct(DependencyClass $dependencyClass = null) {
         $this->dependencyClass = $dependencyClass;
     }
 }
