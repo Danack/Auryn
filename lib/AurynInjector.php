@@ -41,7 +41,7 @@ class AurynInjector implements Injector {
     
     protected $reflectionStorage;
 
-    protected $classConstructorChain = array();
+    private $classConstructorChain = array();
 
     public static $errorMessages = array(
         self::E_MAKE_FAILURE => "Could not make %s: %s",
@@ -356,6 +356,9 @@ class AurynInjector implements Injector {
 
         if ($available == true) {
             //$argument already set.
+        } elseif ($delegation = $this->plugin->getParamDelegation($param->name, $this->classConstructorChain)) {
+            list($delegate, $args) = $delegation;
+            $argument = $this->executeInternal($delegate, $args);
         } elseif ($param->isDefaultValueAvailable()) {
             $argument = $param->getDefaultValue();
         } else {

@@ -53,11 +53,12 @@ interface ProviderPlugin {
      * Shares the specified class across the Injector context
      *
      * @param mixed $classNameOrInstance The class or object to share
+     * @param array $classConstructorChain
      */
-    function shareClass($className, array $classConstructorChain = array());
+    function shareClass($classNameOrInstance, array $classConstructorChain = array());
     
     /**
-     * @param $classNameOrInstance
+     * @param $instance
      * @param array $classConstructorChain
      * @return mixed
      */
@@ -86,6 +87,8 @@ interface ProviderPlugin {
      */
     function getDelegated($lowClass, array $classConstructorChain);
 
+    function getParamDelegation($paramName, array $classConstructorChain);
+    
     /**
      * Delegates the creation of $className instances to $callable
      *
@@ -107,6 +110,7 @@ interface ProviderPlugin {
      */
     public function define($className, array $injectionDefinition);
     
+    public function delegateParam($paramName, $callable, array $classConstructorChain, array $args = array());
     
     /**
      * Assign a global default value for all parameters named $paramName

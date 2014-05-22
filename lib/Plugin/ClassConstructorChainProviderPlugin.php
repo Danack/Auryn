@@ -332,6 +332,14 @@ class ClassConstructorChainProviderPlugin implements ProviderPlugin {
     {
         return [];
     }
+
+    function getParamDelegation($paramName, array $classConstructorChain) {
+    }
+
+    public function delegateParam($paramName, $callable, array $classConstructorChain, array $args = array()) {
+    }
+
+
 }
 
 

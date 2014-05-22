@@ -930,4 +930,17 @@ class ProviderTest extends PHPUnit_Framework_TestCase {
             'Injector used default param instead of creating param.'
         );
     }
+    
+    public function testParamDelegation() {
+        $provider = new Provider();
+        
+        $randomGenerator = function() {
+            return 4;
+        };
+        
+        $provider->delegateParam('random', $randomGenerator);
+        
+        $object = $provider->make('RequiresNonTypeHintedParam');
+        $this->assertEquals(4, $object->random);
+    }
 }

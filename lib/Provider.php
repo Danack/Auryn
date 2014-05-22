@@ -134,7 +134,7 @@ class Provider extends AurynInjector {
      * @return \Auryn\Provider Returns the current instance
      */
     public function delegate($className, $callable, array $args = array()) {
-        $this->plugin->delegate($className, $callable, $this->classConstructorChain, $args);
+        $this->plugin->delegate($className, $callable, [], $args);
 
         return $this;
     }
@@ -152,4 +152,9 @@ class Provider extends AurynInjector {
 
         return $this;
     }
+    
+    public function delegateParam($className, $callable, array $args = array()) {
+        $this->plugin->delegateParam($className, $callable, [], $args);   
+    }
+
 }

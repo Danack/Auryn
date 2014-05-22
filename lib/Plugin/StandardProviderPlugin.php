@@ -10,6 +10,7 @@ class StandardProviderPlugin implements ProviderPlugin {
     protected $aliases = array();
     protected $sharedClasses = array();
     protected $delegatedClasses = array();
+    protected $delegatedParams = array();
     protected $paramDefinitions = array();
     protected $prepares = array();
 
@@ -67,20 +68,18 @@ class StandardProviderPlugin implements ProviderPlugin {
      * Shares the specified class across the Injector context
      *
      * @param string $className The class or object to share
+     * @param array $classConstructorChain
      */
     function shareClass($className, array $classConstructorChain = array()) {
-        
-            $lowClass = ltrim(strtolower($className),'\\');
-            $lowClass = isset($this->aliases[$lowClass])
-                ? strtolower($this->aliases[$lowClass])
-                : $lowClass;
 
-            $this->sharedClasses[$lowClass] = isset($this->sharedClasses[$lowClass])
-                ? $this->sharedClasses[$lowClass]
-                : NULL;
+        $lowClass = ltrim(strtolower($className),'\\');
+        $lowClass = isset($this->aliases[$lowClass])
+            ? strtolower($this->aliases[$lowClass])
+            : $lowClass;
 
-
-        return $this;
+        $this->sharedClasses[$lowClass] = isset($this->sharedClasses[$lowClass])
+            ? $this->sharedClasses[$lowClass]
+            : NULL;
     }
 
     function shareInstance($instance, array $classConstructorChain = array()) {
@@ -196,6 +195,14 @@ class StandardProviderPlugin implements ProviderPlugin {
         return $this->delegatedClasses[$lowClass];
     }
 
+    function getParamDelegation($paramName, array $classConstructorChain) {
+        if (array_key_exists($paramName, $this->delegatedParams)) {
+            return $this->delegatedParams[$paramName];      
+        }
+
+        return null;
+    }
+
     /**
      * Delegates the creation of $class to $callable. Passes $class to $callable as the only argument
      *
@@ -221,6 +228,23 @@ class StandardProviderPlugin implements ProviderPlugin {
 
         return $this;
     }
+
+
+    public function delegateParam($paramName, $callable, array $classConstructorChain, array $args = array()) {
+        if ($this->canExecute($callable)) {
+            $delegate = array($callable, $args);
+        } else {
+            throw new BadArgumentException(
+                sprintf(\Auryn\AurynInjector::$errorMessages[\Auryn\AurynInjector::E_DELEGATE_ARGUMENT], __CLASS__),
+                \Auryn\AurynInjector::E_DELEGATE_ARGUMENT
+            );
+        }
+
+        $this->delegatedParams[$paramName] = $delegate;
+
+        return $this;
+    }
+    
 
     /**
      * Assign a global default value for all parameters named $paramName
