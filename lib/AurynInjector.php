@@ -352,9 +352,9 @@ class AurynInjector implements Injector {
     }
 
     private function buildArgumentFromReflectionParameter(\ReflectionParameter $param) {
-        list($available, $argument) = $this->plugin->getParamDefine($param->name, $this->classConstructorChain);
 
-        if ($available == true) {
+        if ($this->plugin->isParamDefined($param->name, $this->classConstructorChain)) {
+            list($available, $argument) = $this->plugin->getParamDefine($param->name, $this->classConstructorChain);
             //$argument already set.
         } elseif ($delegation = $this->plugin->getParamDelegation($param->name, $this->classConstructorChain)) {
             list($delegate, $args) = $delegation;
@@ -362,9 +362,17 @@ class AurynInjector implements Injector {
         } elseif ($param->isDefaultValueAvailable()) {
             $argument = $param->getDefaultValue();
         } else {
-            $declaringClass = $param->getDeclaringClass()->getName();
+            $declaringClass = $param->getDeclaringClass();
+
+            if ($declaringClass) {
+                $declaringClassName = $declaringClass->getName();   
+            }
+            else {
+                $declaringClassName = 'Unknown';
+            }
+
             throw new InjectionException(
-                sprintf(self::$errorMessages[self::E_UNDEFINED_PARAM], $declaringClass,$param->name),
+                sprintf(self::$errorMessages[self::E_UNDEFINED_PARAM], $declaringClassName, $param->name),
                 self::E_UNDEFINED_PARAM
             );
         }

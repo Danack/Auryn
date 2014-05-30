@@ -231,15 +231,7 @@ class StandardProviderPlugin implements ProviderPlugin {
 
 
     public function delegateParam($paramName, $callable, array $classConstructorChain, array $args = array()) {
-        if ($this->canExecute($callable)) {
-            $delegate = array($callable, $args);
-        } else {
-            throw new BadArgumentException(
-                sprintf(\Auryn\AurynInjector::$errorMessages[\Auryn\AurynInjector::E_DELEGATE_ARGUMENT], __CLASS__),
-                \Auryn\AurynInjector::E_DELEGATE_ARGUMENT
-            );
-        }
-
+        $delegate = array($callable, $args);
         $this->delegatedParams[$paramName] = $delegate;
 
         return $this;
@@ -263,6 +255,10 @@ class StandardProviderPlugin implements ProviderPlugin {
         return $this;
     }
 
+    function isParamDefined($paramName, array $classConstructorChain) {
+        return array_key_exists($paramName, $this->paramDefinitions);
+    }
+    
     function getParamDefine($paramName, array $classConstructorChain) {
         if (array_key_exists($paramName, $this->paramDefinitions)) {
             return array(true, $this->paramDefinitions[$paramName]);

@@ -34,6 +34,9 @@ interface ProviderPlugin {
      */
     function getShared($className, array $classConstructorChain);
 
+
+    function isParamDefined($paramName, array $classConstructorChain);
+    
     /**
      * Return an array that contains a mixture of classnames and scalar values to
      * be used as the parameters for creating an object of type $className
