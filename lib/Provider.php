@@ -325,6 +325,113 @@ class Provider implements Injector {
     }
 
 
+    /** 
+     * “Currying is the decomposition of a polyadic function into a chain of nested 
+     * unary functions. Thus decomposed, you can partially apply one or more 
+     * arguments, although the curry operation itself does not apply any arguments 
+     * to the function.”
+     * 
+     * “Partial application is the conversion of a polyadic function into a function 
+     * taking fewer arguments arguments by providing one or more arguments in advance.”
+     * 
+     * http://raganwald.com/2013/03/07/currying-and-partial-application.html
+     */
+
+    /**
+     * @param callable $callable
+     * @param array $params
+     */
+    public function applyPartial(callable $callable, $params = []) {
+        return $this->apply($callable, $params, false);
+    }
+
+    /**
+     * @param callable $callable
+     * @param array $params
+     */
+    public function applyFully(callable $callable, $params = []) {
+        return $this->apply($callable, $params, true);
+    }
+    
+    /**
+     * @param callable $callable
+     * @param array $params
+     * @return callable
+     */
+    private function apply(callable $callable, $params, $full) {
+        $functionReflection = new \ReflectionFunction($callable);
+        $lamdaParams = [];
+        $useParams = ['$callable'];
+        $fullParams = [];
+        $resolveText = '';
+        $paramCount = 0;
+
+        foreach($functionReflection->getParameters() as $param) {
+            $name = $param->getName();
+            $typehint = $param->getClass();
+            $paramCount++;
+            if (array_key_exists($name, $params) == true) {
+                $resolveText .= "\$$name = \$params['$name']; \n";
+                $useParams[] = '$'.$name;
+                $fullParams[] = '$'.$name;
+                continue;
+            }
+            list($success, $argument) = $this->buildArgumentFromReflectionParameter($param);
+            if ($success) {
+                $paramName = 'param'.$paramCount;
+                $$paramName = $argument;
+                $resolveText .= "\$$paramName = \$$paramName;\n";
+                $useParams[] = '$'.$paramName;
+                $fullParams[] = '$'.$paramName;
+            }
+            else if ($full == true) {
+                //all parameters must be available at apply time
+                $declaringClass = $param->getDeclaringClass()->getName();
+                throw new InjectionException(
+                    sprintf(
+                        $this->errorMessages[self::E_UNDEFINED_PARAM],
+                        $declaringClass,
+                        $param->name
+                    ),
+                    self::E_UNDEFINED_PARAM
+                );
+            }
+            else {
+                //leave the parameter to be passed at call time
+                if ($typehint) {
+                    $lamdaParams[] = sprintf(
+                        "%s \$%s",
+                        '\\'.$typehint->getName(),
+                        $name
+                    );
+                }
+                else {
+                    $lamdaParams[] = sprintf(
+                        "\$%s",
+                        $name
+                    );
+                }
+                $fullParams[] = '$'.$name;
+            }
+        }
+
+        $functionString = sprintf(
+            "%s
+            \$newCallable = function (%s) use(%s) {
+    return \$callable(%s);
+};",
+            $resolveText,
+            implode('', $lamdaParams),
+            implode(', ', $useParams),
+            implode(', ', $fullParams)
+        );
+
+        eval($functionString);
+
+        /** @var  $newCallable callable*/
+        return $newCallable;
+    }
+
     protected function getInjectedInstance($className, array $definition) {
         try {
             $ctorMethod = $this->reflectionStorage->getConstructor($className);
@@ -607,7 +714,19 @@ class Provider implements Injector {
             } elseif (array_key_exists($rawParamKey, $definition)) {
                 $argument = $definition[$rawParamKey];
             } elseif (!$argument = $this->buildArgumentFromTypeHint($function, $param)) {
-                $argument = $this->buildArgumentFromReflectionParameter($param);
+                list($success, $argument) = $this->buildArgumentFromReflectionParameter($param);
+
+                if ($success == false) {
+                    $declaringClass = $param->getDeclaringClass()->getName();
+                    throw new InjectionException(
+                        sprintf(
+                            $this->errorMessages[self::E_UNDEFINED_PARAM],
+                            $declaringClass, 
+                            $param->name
+                        ),
+                        self::E_UNDEFINED_PARAM
+                    );
+                }
             }
 
             $invocationArgs[] = $argument;
@@ -628,14 +747,16 @@ class Provider implements Injector {
             // this behavior.
             $argument = NULL;
         } else {
-            $declaringClass = $param->getDeclaringClass()->getName();
-            throw new InjectionException(
-                sprintf($this->errorMessages[self::E_UNDEFINED_PARAM], $declaringClass, $param->name),
-                self::E_UNDEFINED_PARAM
-            );
+//            $declaringClass = $param->getDeclaringClass()->getName();
+//            throw new InjectionException(
+//                sprintf($this->errorMessages[self::E_UNDEFINED_PARAM], $declaringClass, $param->name),
+//                self::E_UNDEFINED_PARAM
+//            );
+            
+            return [false, null];
         }
 
-        return $argument;
+        return [true, $argument];
     }
 
 

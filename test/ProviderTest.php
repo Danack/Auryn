@@ -919,4 +919,73 @@ class ProviderTest extends PHPUnit_Framework_TestCase {
 
         $this->assertSame(42, $obj->testProp);
     }
+    
+    public function testBasicCurry() {
+        $provider = new Provider();
+        $fooValue = 'foo';
+
+        $callable = function ($foo) {
+            return $foo;
+        };
+
+        $executable = $provider->applyPartial($callable, ['foo' => $fooValue]);
+        $result = $executable();        
+        $this->assertEquals($result, $fooValue);
+    }
+
+    public function testBasicCurryWithParam() {
+        $provider = new Provider();
+        $fooValue = 'foo';
+        $barValue = 'bar';
+
+        $callable = function ($foo, $bar) {
+            return $foo.$bar;
+        };
+
+        $executable = $provider->applyPartial($callable, ['foo' => $fooValue]);
+        
+        $functionReflection = new ReflectionFunction($executable);
+
+        $this->assertEquals(
+            1,
+            $functionReflection->getNumberOfParameters(),
+            "Generated callable should have no params."
+        );
+
+        $result = $executable($barValue);
+        $this->assertEquals($result, $fooValue.$barValue);
+    }
+
+
+    public function testCurryWithAliasThroughProvider() {
+        $provider = new Provider();
+        $provider->alias('SomeInterface', 'SomeImplementation');
+        $isCorrectType = false;
+        $callable = function (SomeInterface $bar) use (&$isCorrectType) {
+            $isCorrectType = true;
+        };
+
+        $executable = $provider->applyFully($callable);
+        $executable();
+        
+        $this->assertTrue($isCorrectType);
+    }
+    
+
+    public function testCurryWithParamThroughProvider() {
+        $fooValue = 'foo';
+        $barValue = 'bar';
+
+        $provider = new Provider();
+        $provider->defineParam('bar', $barValue);
+
+        $callable = function ($foo, $bar) {
+            return $foo.$bar;
+        };
+
+        $executable = $provider->applyPartial($callable, ['foo' => $fooValue]);
+        $result = $executable($barValue);
+        $this->assertEquals($result, $fooValue.$barValue);
+    }
+    
 }
