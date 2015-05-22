@@ -43,6 +43,7 @@ class Injector {
     private $shares = array();
     private $prepares = array();
     private $delegates = array();
+    private $resolveDelegates = array();
     private $inProgressMakes = array();
 
     public function __construct(Reflector $reflector = null) {
@@ -168,6 +169,18 @@ class Injector {
             $name = $this->aliases[$normalizedName];
             $normalizedName = $this->normalizeName($name);
         }
+        else if (isset($this->resolveDelegates[$normalizedName])) {
+            $executable = $this->buildExecutable($this->resolveDelegates[$normalizedName]);
+            $reflectionFunction = $executable->getCallableReflection();
+
+            $inProgres = array_flip($this->inProgressMakes);
+            
+            $args = $this->provisionFuncArgs(
+                $reflectionFunction,
+                [':inProgress' => $inProgres]
+            );
+            $name = call_user_func_array(array($executable, '__invoke'), $args);
+        }
 
         return array($name, $normalizedName);
     }
@@ -248,6 +261,28 @@ class Injector {
     }
 
     /**
+     * Define a callable that will be used to resolve the name of 
+     * a given typehint dyanmically.
+     *
+     * @param string $name
+     * @param mixed $callableOrMethodStr Any callable or provisionable invokable method
+     * @return self
+     */
+    public function resolve($name, $callableOrMethodStr) {
+        if ($this->isExecutable($callableOrMethodStr) === false) {
+            throw new InjectorException(
+                sprintf(self::M_DELEGATE_ARGUMENT, __CLASS__),
+                self::E_DELEGATE_ARGUMENT
+            );
+        }
+
+        $normalizedName = $this->normalizeName($name);
+        $this->resolveDelegates[$normalizedName] = $callableOrMethodStr;
+
+        return $this;
+    }
+
+    /**
      * Retrieve stored data for the specified definition type
      *
      * Exposes introspection of existing binds/delegates/shares/etc for decoration and composition.
@@ -310,7 +345,7 @@ class Injector {
             );
         }
 
-        $this->inProgressMakes[$normalizedClass] = true;
+        $this->inProgressMakes[$normalizedClass] = count($this->inProgressMakes);
 
         // isset() is used specifically here because classes may be marked as "shared" before an
         // instance is stored. In these cases the class is "shared," but it has a null value and

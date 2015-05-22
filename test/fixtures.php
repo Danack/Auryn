@@ -490,3 +490,15 @@ function getDelegateClosureInGlobalScope() {
         return new DelegateClosureInGlobalScope();
     };
 }
+
+interface DynamicLookup {}
+
+class DynamicImpl implements DynamicLookup {}
+
+class DynamicDependency {
+    public $lookup;
+    function __construct(DynamicLookup $lookup) {
+        $this->lookup = $lookup;
+    }
+}
+

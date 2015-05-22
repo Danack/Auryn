@@ -831,4 +831,21 @@ class InjectorTest extends \PHPUnit_Framework_TestCase {
         $injector->delegate('Auryn\Test\DelegateClosureInGlobalScope', $delegateClosure);
         $injector->make('Auryn\Test\DelegateClosureInGlobalScope');
     }
+    
+    public function testDynamicAliasLookup() {
+        $injector = new Injector();
+
+        $lookup = function ($inProgress) {
+            $this->assertInternalType('array', $inProgress);
+            $this->assertCount(1, $inProgress);
+            $this->assertEquals(strtolower('Auryn\Test\DynamicDependency'), $inProgress[0]);
+            
+            return 'Auryn\Test\DynamicImpl';
+        };
+
+        $injector->resolve('Auryn\Test\DynamicLookup', $lookup);
+        $instance = $injector->make('Auryn\Test\DynamicDependency');
+        $this->assertInstanceOf('Auryn\Test\DynamicDependency', $instance);
+        $this->assertInstanceOf('Auryn\Test\DynamicImpl', $instance->lookup);
+    }
 }
