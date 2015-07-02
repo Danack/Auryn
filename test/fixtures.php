@@ -505,4 +505,27 @@ class CloneTest {
         $this->injector = clone $injector;
     }
 }
-    
+
+class InjectionChainValue {
+    public $value;
+    public function __construct($value) {
+        $this->value = $value;
+    }
+}
+
+class InjectionChainTestDepdendency {
+    public $icv;
+    function __construct(InjectionChainValue $icv) {
+        $this->icv = $icv;
+    }
+} 
+
+class InjectionChainTest {
+    public $icv;
+    public $dependency;
+    public function __construct(InjectionChainTestDepdendency $ictd,
+                                InjectionChainValue $icv) {
+        $this->dependency = $ictd;
+        $this->icv = $icv;
+    }
+}

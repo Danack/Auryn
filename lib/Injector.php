@@ -53,6 +53,10 @@ class Injector {
         $this->inProgressMakes = array();
     }
     
+    public function getInjectionChain() {
+        return new InjectionChain($this->inProgressMakes);
+    }
+    
     /**
      * Define instantiation directives for the specified class
      *
@@ -518,6 +522,10 @@ class Injector {
             $executable = $this->buildExecutable($prepare);
             $executable($obj, $this);
         }
+        if (is_string($obj) == false && is_object($obj) == false) {
+            echo "hmm.";
+        }
+        
         if ($interfaces = class_implements($obj)) {
             $interfaces = array_flip(array_map(array($this, 'normalizeName'), $interfaces));
             $prepares = array_intersect_key($this->prepares, $interfaces);

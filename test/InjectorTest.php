@@ -871,4 +871,36 @@ class InjectorTest extends \PHPUnit_Framework_TestCase {
         $newInjector = $instance->injector;
         $newInstance = $newInjector->make('Auryn\Test\CloneTest');
     }
+    
+    public function testInjectionChainValue() {
+
+        $fn = function (\Auryn\InjectionChain $ic) {
+            
+            $inProgressMakes = $ic->getInProgressMakes();
+            
+            if (array_key_exists(
+                strtolower('Auryn\Test\InjectionChainTestDepdendency'),
+                $inProgressMakes)
+            ) {
+                return new \Auryn\Test\InjectionChainValue("Value for depdendency");
+            }
+            else if (array_key_exists(
+                strtolower('Auryn\Test\InjectionChainTest'),
+                $inProgressMakes)
+            ) {
+                return new \Auryn\Test\InjectionChainValue("Value for parent");
+            }
+            
+            return new \Auryn\Test\InjectionChainValue("unknown value");
+        };
+
+        $injector = new Injector();
+        $injector->share($injector);
+        $injector->delegate('Auryn\Test\InjectionChainValue', $fn);
+        $injector->delegate('Auryn\InjectionChain', [$injector, 'getInjectionChain']);
+
+        $object = $injector->make('Auryn\Test\InjectionChainTest');
+        $this->assertEquals($object->icv->value, "Value for parent");
+        $this->assertEquals($object->dependency->icv->value, "Value for depdendency");
+    }
 }
