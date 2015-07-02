@@ -897,7 +897,7 @@ class InjectorTest extends \PHPUnit_Framework_TestCase {
         $injector = new Injector();
         $injector->share($injector);
         $injector->delegate('Auryn\Test\InjectionChainValue', $fn);
-        $injector->delegate('Auryn\InjectionChain', [$injector, 'getInjectionChain']);
+        $injector->delegate('Auryn\InjectionChain', array($injector, 'getInjectionChain'));
 
         $object = $injector->make('Auryn\Test\InjectionChainTest');
         $this->assertEquals($object->icv->value, "Value for parent");
