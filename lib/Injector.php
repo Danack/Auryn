@@ -258,7 +258,7 @@ class Injector
      * @throws ConfigException if $callableOrMethodStr is not a callable.
      * @return self
      */
-    public function delegate($name, $callableOrMethodStr)
+    public function delegate($name, $callableOrMethodStr, array $args = array())
     {
         if ($this->isExecutable($callableOrMethodStr) === false) {
             $errorDetail = '';
@@ -279,7 +279,23 @@ class Injector
             );
         }
         $normalizedName = $this->normalizeName($name);
-        $this->delegates[$normalizedName] = $callableOrMethodStr;
+        
+        $normalizedArgs = [];
+        foreach ($args as $key => $value) {
+            $firstLetter = substr($key, 0, 1);
+            if ($firstLetter === self::A_DEFINE ||
+                $firstLetter === self::A_DELEGATE || 
+                $firstLetter === self::A_RAW) {
+                $normalizedArgs[$key] = $value;
+                continue;
+            }
+            else {
+                $normalizedArgs[$this->normalizeName($key)] = $value;
+            }
+        }
+
+        $delegate = array($callableOrMethodStr, $normalizedArgs);
+        $this->delegates[$normalizedName] = $delegate;
 
         return $this;
     }
@@ -365,9 +381,12 @@ class Injector
         }
 
         if (isset($this->delegates[$normalizedClass])) {
-            $executable = $this->buildExecutable($this->delegates[$normalizedClass]);
+            list($callable, $delegteArgs) = $this->delegates[$normalizedClass];
+            //@TODO - the order of merging is full of edge-cases 
+            $mergedArgs = array_merge($delegteArgs, $args);
+            $executable = $this->buildExecutable($callable);
             $reflectionFunction = $executable->getCallableReflection();
-            $args = $this->provisionFuncArgs($reflectionFunction, $args);
+            $args = $this->provisionFuncArgs($reflectionFunction, $mergedArgs);
             $obj = call_user_func_array(array($executable, '__invoke'), $args);
         } else {
             $obj = $this->provisionInstance($className, $normalizedClass, $args);
@@ -450,19 +469,22 @@ class Injector
             if (isset($definition[$i]) || array_key_exists($i, $definition)) {
                 // indexed arguments take precedence over named parameters
                 $arg = $definition[$i];
-            } elseif (isset($definition[$name]) || array_key_exists($name, $definition)) {
+            }
+            elseif (isset($definition[$name]) || array_key_exists($name, $definition)) {
                 // interpret the param as a class name to be instantiated
                 $arg = $this->make($definition[$name]);
-            } elseif (($prefix = self::A_RAW . $name) && (isset($definition[$prefix]) || array_key_exists($prefix, $definition))) {
+            }
+            elseif (($prefix = self::A_RAW . $name) && (isset($definition[$prefix]) || array_key_exists($prefix, $definition))) {
                 // interpret the param as a raw value to be injected
                 $arg = $definition[$prefix];
-            } elseif (($prefix = self::A_DELEGATE . $name) && isset($definition[$prefix])) {
+            }
+            elseif (($prefix = self::A_DELEGATE . $name) && isset($definition[$prefix])) {
                 // interpret the param as an invokable delegate
                 $arg = $this->buildArgFromDelegate($name, $definition[$prefix]);
             } elseif (($prefix = self::A_DEFINE . $name) && isset($definition[$prefix])) {
                 // interpret the param as a class definition
                 $arg = $this->buildArgFromParamDefineArr($definition[$prefix]);
-            } elseif (!$arg = $this->buildArgFromTypeHint($reflFunc, $reflParam)) {
+            } elseif (!$arg = $this->buildArgFromTypeHint($reflFunc, $reflParam, $definition)) {
                 $arg = $this->buildArgFromReflParam($reflParam);
             }
 
@@ -507,18 +529,22 @@ class Injector
         return $executable($paramName, $this);
     }
 
-    private function buildArgFromTypeHint(\ReflectionFunctionAbstract $reflFunc, \ReflectionParameter $reflParam)
+    private function buildArgFromTypeHint(\ReflectionFunctionAbstract $reflFunc, \ReflectionParameter $reflParam, $args = [])
     {
         $typeHint = $this->reflector->getParamTypeHint($reflFunc, $reflParam);
 
         if (!$typeHint) {
-            $obj = null;
-        } elseif ($reflParam->isDefaultValueAvailable()) {
-            $normalizedName = $this->normalizeName($typeHint);
+            return null;
+        }
+        $normalizedName = $this->normalizeName($typeHint);
+        if (array_key_exists($normalizedName, $args) && is_object($args[$normalizedName])) {
+            return $args[$normalizedName];
+        } else if ($reflParam->isDefaultValueAvailable()) {
             // Injector has been told explicitly how to make this type
-            if (isset($this->aliases[$normalizedName]) ||
+             if (isset($this->aliases[$normalizedName]) ||
                 isset($this->delegates[$normalizedName]) ||
-                isset($this->shares[$normalizedName])) {
+                isset($this->shares[$normalizedName])
+            ) {
                 $obj = $this->make($typeHint);
             } else {
                 $obj = $reflParam->getDefaultValue();

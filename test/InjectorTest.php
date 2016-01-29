@@ -1104,4 +1104,25 @@ class InjectorTest extends \PHPUnit_Framework_TestCase
         $injector->define('Auryn\Test\ParentWithConstructor', array(':foo' => 'parent'));
         $injector->make('Auryn\Test\ChildWithoutConstructor');
     }
+    
+    public function testMakeDelegateWithArgs() {
+        $injector = new Injector();
+
+        $fn = function(
+            \Auryn\Test\MakeDelegateWithArgsDependency $makeDelegateWithArgsDependency, 
+            $arg1,
+            $arg2
+        ) {
+            return new MakeDelegateWithArgs($makeDelegateWithArgsDependency, $arg1, $arg2);
+        };
+
+        $params = array(
+            ':arg1' => 1,
+            ':arg2' => 2,
+            'Auryn\Test\MakeDelegateWithArgsDependency' => MakeDelegateWithArgsDependency::create()
+        );
+        $injector->delegate('Auryn\Test\MakeDelegateWithArgs', $fn, $params);
+        $obj = $injector->make('Auryn\Test\MakeDelegateWithArgs');
+        $this->assertInstanceOf('Auryn\Test\MakeDelegateWithArgs', $obj);
+    }
 }

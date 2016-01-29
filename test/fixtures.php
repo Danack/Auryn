@@ -713,3 +713,18 @@ class ParentWithConstructor {
 
 class ChildWithoutConstructor extends ParentWithConstructor {
 }
+
+class MakeDelegateWithArgsDependency {
+    private function __construct() {}
+    public static function create() {
+        return new self();
+    }
+}
+
+class MakeDelegateWithArgs {
+    function __construct(MakeDelegateWithArgsDependency $makeDelegateWithArgsDependency, $arg1, $arg2) {
+        $this->makeDelegateWithArgsDependency = $makeDelegateWithArgsDependency;
+        $this->arg1 = $arg1;
+        $this->arg2 = $arg2;
+    }
+}
